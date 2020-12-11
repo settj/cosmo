@@ -13,7 +13,7 @@
 using namespace boost;
 
 template <class t_debruijn_graph = debruijn_graph_shifted<>,
-          class t_lcs_vector     = wt_int<rrr_vector<63>> >
+          class t_lcs_vector     = sdsl::wt_int<sdsl::rrr_vector<63>> >
 class debruijn_hypergraph {
   // Nodes are now ranges of edges (could be done for standard de bruijn graph too...
   // would save time by saving state?)

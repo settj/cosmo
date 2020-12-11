@@ -3,57 +3,26 @@
 #include <vector>
 #include <string>
 #include <libgen.h> // basename
+#include <future>
+#include <sys/timeb.h>
 
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-#include "io.hpp"
 #include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
-#include "cosmo-color-pd.hpp"
-#include <future>
-using namespace std;
-using namespace sdsl;
-
-#include <sys/timeb.h>
-
-
-
-//////////// pack-color headers
-
-
-#include <iostream>
-#include <fstream>
-#include <utility>
-#include <ctime>
-
-// TCLAP
-#include "tclap/CmdLine.h"
-
-#include <sdsl/bit_vectors.hpp>
-#include <cstdio>
-
-#include <cstdlib>
-
-#include <libgen.h>
-
-// Custom Headers
-//#include "uint128_t.hpp"
 //#include "debug.h"
-#include "kmer.hpp"
 
-//using namespace std;
-//using namespace sdsl;
-
-#include <cstdlib>
-#include <sys/timeb.h>
-//#include "pack-color.hpp"
-
-
-
-
+struct parameters_t {
+    std::string input_filename = "";
+    std::string color_filename = "";
+    std::string output_prefix = "";
+    std::string ref_color = "";
+    std::string sample_mask = "";
+    std::string ref_fasta = "";
+    std::string output_matrix = "";
+};
 
 
 
@@ -63,13 +32,12 @@ string file_extension = ".dbg";
 
 unsigned long long global_perseq_t;
 unsigned long long global_t;
-static char base[] = {'?','A','C','G','T'};
 char dna_bases[] = "$ACGT";
 
 
 debruijn_graph_shifted<>* gdbg;
-//sd_vector<>* gcolors;
-//rank_support_sd<>* gcolor_ranks;
+//sdsl::sd_vector<>* gcolors;
+//sdsl::rank_support_sd<>* gcolor_ranks;
 
 
 int getMilliCount(){
@@ -133,17 +101,17 @@ int main(int argc, char* argv[])
     
 
     // load the color matrix
-    sd_vector<> colors;
+    sdsl::sd_vector<> colors;
     std::cerr << "=== Loading data structures from disk ==" << std::endl;
     load_from_file(colors, p.input_filename);
     std::cerr << "Elapsed wall time: " << (getMilliCount() - global_t) / 1000.0 << " s" << std::endl;
 
     unsigned long long rows = atoll(p.ref_color.c_str());
     unsigned long long cols = atoll(p.sample_mask.c_str());
-    std::cerr << "rows*cols = " << rows*cols << " sd_vector.size(): " << colors.size() << std::endl;
+    std::cerr << "rows*cols = " << rows*cols << " sdsl::sd_vector.size(): " << colors.size() << std::endl;
 
-    rank_support_sd<1> color_ranks(&colors);
-    select_support_sd<1> color_selects(&colors);
+    sdsl::rank_support_sd<1> color_ranks(&colors);
+    sdsl::select_support_sd<1> color_selects(&colors);
 
     unsigned long long num_ones = color_ranks(colors.size()-1);
     std::cerr << "num 1's: " << num_ones << std::endl;
@@ -189,8 +157,8 @@ int main(int argc, char* argv[])
     std::cerr << "sd_vector items: " << b_builder.items()  << " sd_vector capacity " << b_builder.capacity() << std::endl;
     std::cerr << "Elapsed wall time: " << (getMilliCount() - global_t) / 1000.0 << " s" << std::endl;    
     sdsl::sd_vector<> b(b_builder);
-    select_support_sd<1> b_color_selects(&b);
-    rank_support_sd<1> b_color_ranks(&b);
+    sdsl::select_support_sd<1> b_color_selects(&b);
+    sdsl::rank_support_sd<1> b_color_ranks(&b);
 
     
     unsigned long long b_num_ones = b_color_ranks(b.size()-1);
@@ -206,8 +174,4 @@ int main(int argc, char* argv[])
         if (i < 10) std::cerr << i <<"th set bit is at " << elemval << std::endl;
     }
     sdsl::store_to_file(b, p.color_filename );
-
-  
-
-
 }

@@ -1,9 +1,21 @@
 # Project Executable
+color-merge
 cosmo-build
 cosmo-assemble
 cosmo-color
+cosmo-color-pd
 cosmo-benchmark
 cosmo-test
+cosmo-merge
+cosmo-dump
+cosmo-dump-full-edges
+pack-color
+transpose
+vari-merge
+vari-delete
+
+# 3rd party libs
+3rd_party*/*
 
 # Compiling
 compiler_flags

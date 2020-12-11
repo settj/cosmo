@@ -3,24 +3,29 @@
 #include <vector>
 #include <string>
 #include <libgen.h> // basename
+#include <future>
+#include <sys/timeb.h>
 
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-#include "io.hpp"
 #include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
-#include "cosmo-color-pd.hpp"
-#include <future>
-using namespace std;
-using namespace sdsl;
 
-#include <sys/timeb.h>
+
+struct parameters_t {
+    std::string input_filename = "";
+    std::string color_filename = "";
+    std::string output_prefix = "";
+    std::string ref_color = "";
+    std::string sample_mask = "";
+    std::string ref_fasta = "";
+    std::string output_matrix = "";
+};
 
 bool trace = false;
-string file_extension = ".dbg";
+std::string file_extension = ".dbg";
 
 unsigned long long global_perseq_t;
 unsigned long long global_t;
@@ -30,8 +35,8 @@ char dna_bases[] = "$ACGT";
 unsigned colorgroups[] = {1, 25, 49, 57, 72, 88};
 unsigned num_colorgroups = 5;
 debruijn_graph_shifted<>* gdbg;
-sd_vector<>* gcolors;
-rank_support_sd<>* gcolor_ranks;
+sdsl::sd_vector<>* gcolors;
+sdsl::rank_support_sd<>* gcolor_ranks;
 const char *const starts[] = {"GCCATACTGCGTCATGTCGCCCTGACGCGC","GCAGGTTCGAATCCTGCACGACCCACCAAT","GCTTAACCTCACAACCCGAAGATGTTTCTT","AAAACCCGCCGAAGCGGGTTTTTACGTAAA","AATCCTGCACGACCCACCAGTTTTAACATC","AGAGTTCCCCGCGCCAGCGGGGATAAACCG","GAATACGTGCGCAACAACCGTCTTCCGGAG"};
 
 int getMilliCount(){
@@ -57,17 +62,17 @@ void parse_arguments(int argc, char **argv, parameters_t & params)
             ".packed edge file (output from pack-edges).", true, "", "input_file", cmd);
   TCLAP::UnlabeledValueArg<std::string> color_filename_arg("color",
             ".color file (output from pack-edges).", true, "", "color_file", cmd);
-  string output_short_form = "output_prefix";
+  std::string output_short_form = "output_prefix";
   TCLAP::ValueArg<std::string> output_prefix_arg("o", "output_prefix",
             "Output prefix. Graph will be written to [" + output_short_form + "]" + file_extension + ". " +
             "Default prefix: basename(input_file).", false, "", output_short_form, cmd);
-  string ref_color = "ref_color";
+  std::string ref_color = "ref_color";
   TCLAP::ValueArg<std::string> ref_color_arg("a", "ref_color",
 	    "Ref color, ref_color [" + ref_color + "]", false, "", ref_color, cmd);
-  string sample_mask = "sample_mask";
+  std::string sample_mask = "sample_mask";
   TCLAP::ValueArg<std::string> sample_mask_arg("b", "sample_mask",
 	    "Sample mask, sample_mask [" + sample_mask + "]", false, "", sample_mask, cmd);
-  string ref_fasta = "ref_fasta";
+  std::string ref_fasta = "ref_fasta";
   TCLAP::ValueArg<std::string> ref_fasta_arg("r", "ref_fasta",
 	    "Reference FASTA filename, ref_fasta [" + ref_fasta + "]", false, "", ref_fasta, cmd);
 
@@ -117,7 +122,7 @@ void dump_edges(debruijn_graph_shifted<>& dbg, uint64_t * colors)
 }
 
 
-ssize_t get_first_node(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, uint64_t ref_color, std::string& ref_fasta_content)
+ssize_t get_first_node(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors, uint64_t ref_color, std::string& ref_fasta_content)
 {
 
     
@@ -130,7 +135,7 @@ ssize_t get_first_node(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, uint6
     ssize_t node_num = 0;
     std::string node_label;
     std::string query = ref_fasta_content.substr(0, dbg.node_label(0).size()/*hack to get the edge kmer size*/);
-    for (; node_num < (size_t)dbg.num_edges(); ++ node_num) {
+    for (; node_num < (ssize_t)dbg.num_edges(); ++ node_num) {
         if (colors[node_num * num_colors + ref_color]) {
             zeroth_rank_edge = node_num;
             node_label = dbg.node_label(zeroth_rank_edge);
@@ -195,7 +200,7 @@ void advance(debruijn_graph_shifted<>& dbg, const std::string& ref_fasta_content
 }
 
     
-void dumping_advance(debruijn_graph_shifted<>& dbg, const std::string& ref_fasta_content, const unsigned amount, ssize_t& node_k, ssize_t& node_k_pos, rank_support_sd<1>& color_ranks, std::vector<unsigned>& group_counts, unsigned num_colors, std::stringstream& ret)
+void dumping_advance(debruijn_graph_shifted<>& dbg, const std::string& ref_fasta_content, const unsigned amount, ssize_t& node_k, ssize_t& node_k_pos, sdsl::rank_support_sd<1>& color_ranks, std::vector<unsigned>& group_counts, unsigned num_colors, std::stringstream& ret)
 {
     //std::cout << dbg.node_label(node_k) << " ";
     unsigned node_label_size = dbg.k - 1;  
@@ -226,7 +231,7 @@ void dumping_advance(debruijn_graph_shifted<>& dbg, const std::string& ref_fasta
 }
 
 
-int colored_outdegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t sample_mask, unsigned num_colors, sd_vector<> &colors)
+int colored_outdegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t sample_mask, unsigned num_colors, sdsl::sd_vector<> &colors)
 {
     unsigned out_count = 0;
 
@@ -254,7 +259,7 @@ int colored_outdegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t s
     
 }
 
-int colored_indegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t sample_mask, unsigned num_colors, sd_vector<> &colors)
+int colored_indegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t sample_mask, unsigned num_colors, sdsl::sd_vector<> &colors)
 {
     unsigned in_count = 0;
     
@@ -285,7 +290,7 @@ int colored_indegree(debruijn_graph_shifted<>& dbg, ssize_t v, const uint64_t sa
 //FIXME: add asserts to check the color for the reference genome; it's somewhat annoying user has to specify both the color and the reference genome; we should be able to derive one from the other for the overall flow and having the data replicated could lead to inconsistency errors.
 /*FIXME: sample_mask is limited to 64 colors*/
 // FIXME: how to handle multiple colors?  Treat them all the same? Or do we have to bookkeep individual color results during one traversal.  What to do about divergence in the latter case?
-void get_supernode(debruijn_graph_shifted<>& dbg, const ssize_t& node_i, const uint64_t sample_mask , std::vector<ssize_t>& s, unsigned num_colors,  sd_vector<> &colors, int& node_i_pos_in_supernode)
+void get_supernode(debruijn_graph_shifted<>& dbg, const ssize_t& node_i, const uint64_t sample_mask , std::vector<ssize_t>& s, unsigned num_colors,  sdsl::sd_vector<> &colors, int& node_i_pos_in_supernode)
 {
     node_i_pos_in_supernode = 0;
 
@@ -308,7 +313,7 @@ void get_supernode(debruijn_graph_shifted<>& dbg, const ssize_t& node_i, const u
 
                 // walk along edges until we encounter 
                 ssize_t node_pos = dbg._edge_to_node(edge);
-                while (/*colored_indegree(dbg, node_pos, sample_mask, num_colors, colors) == 1 /*FIXME: should be == 1*//* &&*/ colored_outdegree(dbg, node_pos, sample_mask, num_colors, colors) == 1) {
+                while (/*colored_indegree(dbg, node_pos, sample_mask, num_colors, colors) == 1*/ /*FIXME: should be == 1*//* &&*/ colored_outdegree(dbg, node_pos, sample_mask, num_colors, colors) == 1) {
 
                     ssize_t next_edge = 0;
                     for (unsigned long x2 = 1; x2 < dbg.sigma + 1; x2++) { // iterate through the alphabet
@@ -410,7 +415,7 @@ const unsigned M = 200000; // "a maximum size M of variant to be searched for" -
 // for KMC2 k=32, Found fasta start at edge num 7471236
 //  and node_i_pos = 0. node_i = 7471236.
 
-std::string find_divergent_paths(debruijn_graph_shifted<>& dbg, sd_vector<> &colors,  uint64_t sample_mask, std::string& ref_fasta_content)
+std::string find_divergent_paths(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors,  uint64_t sample_mask, std::string& ref_fasta_content)
 {
     std::stringstream ret;
     int variant_num = 0;
@@ -586,7 +591,7 @@ std::string walk_refs(std::string ref_fasta_content )
 
 
 
-void dump_node(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, ssize_t v)
+void dump_node(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors, ssize_t v)
 {
     std::cout << dbg.node_label(v) ;
     int num_colors = colors.size() / dbg.num_edges();
@@ -668,7 +673,7 @@ void dump_node(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, ssize_t v)
 
 }
 
-void dump_graph_shifted(debruijn_graph_shifted<>& dbg, sd_vector<> &colors)
+void dump_graph_shifted(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors)
 {
 
     
@@ -679,12 +684,12 @@ void dump_graph_shifted(debruijn_graph_shifted<>& dbg, sd_vector<> &colors)
 
 
     
-void find_bubbles(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, uint64_t ref_color, uint64_t sample_mask)
+void find_bubbles(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors, uint64_t ref_color, uint64_t sample_mask)
 {
     int t = getMilliCount();
     int num_colors = colors.size() / dbg.num_edges();
     //uint64_t combined_mask = ref_color | sample_mask;
-    bit_vector visited = bit_vector(dbg.num_nodes(), 0);
+    sdsl::bit_vector visited = sdsl::bit_vector(dbg.num_nodes(), 0);
     cout << "Starting to look for bubbles\n";
     std::vector<std::string> branch(2);
     bool found_miss = false;
@@ -708,7 +713,7 @@ void find_bubbles(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, uint64_t r
             branch[0].clear();
             branch[1].clear();
 
-            int branch_offset = 0;
+            //int branch_offset = 0;
             uint64_t branch_color[2];
 
 
@@ -763,7 +768,7 @@ void find_bubbles(debruijn_graph_shifted<>& dbg, sd_vector<> &colors, uint64_t r
                 // cout << "Stopped due to : " << dbg.indegree(node_pos) << ":" << dbg.outdegree(node_pos) << ":" << branch_offset << "\n";
 
                 end[branch_num++] =  (dbg.indegree(node_pos) > 1) ? node_pos : 0;
-                branch_offset = 0;
+                //branch_offset = 0;
             }
             // check if both branches ended on the same kmer and they pass the requested color masks
             //cout << "Trying " << branch_color[0] << ":" << branch_color[1] << " " << end[0] << ":" << end[1] <<"\n";
@@ -847,7 +852,7 @@ int main(int argc, char* argv[])
   load_from_file(dbg, p.input_filename);
   std::cerr << "done" << std::endl << "graph load wall time: " << (getMilliCount() - t) / 1000.0 << " s" << std::endl;
 
-  sd_vector<> colors;
+  sdsl::sd_vector<> colors;
   unsigned long long t2 = getMilliCount();
   std::cerr << "Loading color matrix...";
   load_from_file(colors, p.color_filename);
@@ -871,16 +876,16 @@ int main(int argc, char* argv[])
   //dump_nodes(dbg, colors);
   //dump_edges(dbg, colors);
   // uint64_t mask1 = (p.ref_color.length() > 0) ? atoi(p.ref_color.c_str()) : -1;
-  uint64_t mask2 = (p.sample_mask.length() > 0) ? atoi(p.sample_mask.c_str()) : -1;
+  //uint64_t mask2 = (p.sample_mask.length() > 0) ? atoi(p.sample_mask.c_str()) : -1;
   std::vector<std::string> ref_fastas;
   std::vector<std::string> ids;
 //  std::string ref_fasta_content;
   std::cerr << "Loading reference FASTA file " << p.ref_fasta  << "...";
   std::cerr << "Loaded " << parse_fasta(p.ref_fasta, ref_fastas, ids) << " sequences" << std::endl;
   std::cerr << "Total wall time: " << (getMilliCount() - global_t) / 1000.0 << " s" << std::endl;
-  int i = 0;
+  size_t i = 0;
   std::cerr << "Creating Rank support..." ;
-  rank_support_sd<1> color_ranks(&colors);
+  sdsl::rank_support_sd<1> color_ranks(&colors);
 
   std::cerr << "done" << std::endl << "Total wall time: " << (getMilliCount() - global_t) / 1000.0 << " s" << std::endl;
 
@@ -908,7 +913,7 @@ int main(int argc, char* argv[])
 //   std::cerr << "=== path divergence ====" << std::endl;
 //     for (i=0; i < ref_fastas.size(); ++i) {
 //         std::cerr << "ref seq " << i << " :" << ids[i] << std::endl;
-// //        void find_divergent_paths(debruijn_graph_shifted<>& dbg, sd_vector<> &colors,  uint64_t sample_mask, std::string& ref_fasta_content);
+// //        void find_divergent_paths(debruijn_graph_shifted<>& dbg, sdsl::sd_vector<> &colors,  uint64_t sample_mask, std::string& ref_fasta_content);
 //         find_divergent_paths(dbg, colors, mask2, ref_fastas[i]);
 //   }
 //   std::cerr << "Total wall time: " << (getMilliCount() - global_t) / 1000.0 << " s" << std::endl;

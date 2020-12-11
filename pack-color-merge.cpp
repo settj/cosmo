@@ -1,30 +1,30 @@
-
 #include <iostream>
 #include <fstream>
 #include <utility>
 #include <ctime>
+#include <sys/timeb.h>
+#include <cstdio>
+#include <cstdlib>
+#include <libgen.h>
 
 // TCLAP
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
-#include <cstdio>
 
-#include <cstdlib>
-
-#include <libgen.h>
-
-// Custom Headers
-//#include "uint128_t.hpp"
-//#include "debug.h"
-#include "kmer.hpp"
-
-//using namespace std;
-//using namespace sdsl;
-
-#include <cstdlib>
-#include <sys/timeb.h>
-#include "pack-color-merge.hpp"
+typedef struct p
+{
+    std::string plan_filename = "";
+    std::string matrix1_filename = "";
+    int num_colors1;
+    std::string matrix2_filename = "";
+    int num_colors2;
+    unsigned long long m1;
+    unsigned long long n1;
+    unsigned long long m2;
+    unsigned long long n2;
+    std::string output_prefix = "";
+} parameters_t;
 
 int getMilliCount()
 {

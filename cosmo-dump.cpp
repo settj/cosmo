@@ -9,15 +9,13 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-#include "io.hpp"
 #include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
-#include "cosmo-dump.hpp"
-
-//using namespace std;
-//using namespace sdsl;
 
 #include <sys/timeb.h>
+
+struct parameters_t {
+  std::string input_filename = "";
+};
 
 
 int getMilliCount(){
@@ -44,9 +42,6 @@ void parse_arguments(int argc, char **argv, parameters_t & params)
 
   params.input_filename  = input_filename_arg.getValue();
 }
-
-static char base[] = {'?','A','C','G','T'};
-
 
 void test_symmetry(debruijn_graph_shifted<> dbg) {
   for (unsigned long x = 0; x<dbg.sigma+1;x++) {
@@ -77,10 +72,6 @@ void dump_edges(debruijn_graph_shifted<> dbg, uint64_t * colors) {
   }
 }
 
-
-
-
-
 int main(int argc, char* argv[]) {
   parameters_t p;
   parse_arguments(argc, argv, p);
@@ -88,10 +79,6 @@ int main(int argc, char* argv[]) {
   cerr << "loading dbg" << std::endl;
   debruijn_graph_shifted<> dbg;
   load_from_file(dbg, p.input_filename);
-
-
-
-
 
   cerr << "k             : " << dbg.k << endl;
   cerr << "num_nodes()   : " << dbg.num_nodes() << endl;
@@ -121,6 +108,4 @@ int main(int argc, char* argv[]) {
   for (uint64 i = 0; i < dbg.sigma + 1; ++i) {
       std::cout << (dbg.m_symbol_ends[i]) << std::endl;
   }
- 
-
 }

@@ -1,8 +1,3 @@
-#include "kmer.hpp"
-#include "utility.hpp"
-#include "debug.hpp"
-#include "multi_bit_vector.hpp"
-#include "bgl_sdb_adapter.hpp"
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 #include <boost/filesystem.hpp>
@@ -14,6 +9,12 @@
 #define BOOST_TEST_MODULE BGL SDB Adpater Test
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/included/unit_test.hpp>
+
+#include "kmer.hpp"
+#include "utility.hpp"
+#include "debug.hpp"
+#include "multi_bit_vector.hpp"
+#include "bgl_sdb_adapter.hpp"
 
 /*
   Test graph without dummy shifts.
@@ -189,9 +190,9 @@ BOOST_AUTO_TEST_CASE ( create_graph_using_constructor )
   size_t k = 4;
   std::string alphabet = "$ACGT";
 
-  bit_vector node_bv(node_flags.length(), 1);
-  bit_vector dummy_bv(dummy_flags.length(), 0);
-  int_vector<8> edges_v(edges.length(), 0);
+  sdsl::bit_vector node_bv(node_flags.length(), 1);
+  sdsl::bit_vector dummy_bv(dummy_flags.length(), 0);
+  sdsl::int_vector<8> edges_v(edges.length(), 0);
 
   for (unsigned int i = 0; i < edges.length(); ++i) {
     if (node_flags[i] == '1') node_bv[i] = 0;
@@ -200,7 +201,7 @@ BOOST_AUTO_TEST_CASE ( create_graph_using_constructor )
   }
   sd_vector<> node_flags(node_bv);
   sd_vector<> dummy_flags(dummy_bv);
-  typedef wt_huff<rrr_vector<63>> edge_idx_t;
+  typedef sdsl::wt_huff<sdsl::rrr_vector<63>> edge_idx_t;
   //typedef cosmo::multi_bit_vector<> edge_idx_t;
   typedef debruijn_graph<edge_idx_t> dbg_t;
   edge_idx_t edge_idx;

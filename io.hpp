@@ -29,9 +29,6 @@
 static const size_t MAX_BITS_PER_KMER = 128;
 static const size_t BUFFER_SIZE = 1024 * 1024;
 
-using namespace std;
-
-
 namespace {
 
 static inline uint64_t nibblet_reverse(const uint64_t &word)
@@ -243,7 +240,7 @@ size_t kmc_read_kmers(std::vector<CKMCFile *> &kmer_data_bases, uint32_t k, Visi
         // std::string s1 = const_cast<CKmerAPI*>(&(queue.top().second))->to_string();
         // std::string s2 = const_cast<CKmerAPI*>(&(current.second))->to_string();
         // if (s1 == s2) { // if this is the same kmer we've seen before
-        if (*const_cast<CKmerAPI*>(&(std::get<1>(queue.top()))) == *const_cast<CKmerAPI*>(&(std::get<1>(current)))) { // if this is the same kmer we've seen before
+        if (*const_cast<CKmerAPI*>(&(std::get<1>(queue.top()))) == *const_cast<CKmerAPI*>(&(std::get<1>(current)))) { //if this is the same kmer we've seen before
             queue_entry additional_instance = pop_replace(queue, kmer_data_bases, k);
             update_multiplicity(additional_instance, max_multiplicity, multiplicity_histogram);
             kmer_token_count += std::get<2>(additional_instance);

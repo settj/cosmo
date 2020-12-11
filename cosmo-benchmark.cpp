@@ -18,18 +18,12 @@
 #include <boost/filesystem.hpp>
 //#include <boost_iterator/zip_iterator.hpp>
 
-#include "io.hpp"
-#include "debruijn_graph.hpp"
+//#include "io.hpp"
 #include "debruijn_graph_shifted.hpp"
 #include "debruijn_hypergraph.hpp"
-#include "algorithm.hpp"
-#include "wt_algorithm.hpp"
 
-using namespace std;
-using namespace sdsl;
-
-string graph_extension = ".dbg";
-string contig_extension = ".fasta";
+std::string graph_extension = ".dbg";
+std::string contig_extension = ".fasta";
 
 struct parameters_t {
   std::string input_filename = "";
@@ -42,7 +36,7 @@ void parse_arguments(int argc, char **argv, parameters_t & params)
   TCLAP::CmdLine cmd("Cosmo Copyright (c) Alex Bowe (alexbowe.com) 2014", ' ', VERSION);
   TCLAP::UnlabeledValueArg<std::string> input_filename_arg("input",
             ".dbg file (output from cosmo-build).", true, "", "input_file", cmd);
-  string output_short_form = "output_prefix";
+  std::string output_short_form = "output_prefix";
   TCLAP::ValueArg<std::string> output_prefix_arg("o", "output_prefix",
             "Output prefix. Contigs will be written to [" + output_short_form + "]" + contig_extension + ". " +
             "Default prefix: basename(input_file).", false, "", output_short_form, cmd);
@@ -75,7 +69,7 @@ int main(int argc, char* argv[]) {
   cerr << "Bits per edge : " << bits_per_element(g) << " Bits" << endl;
 
   #ifdef VAR_ORDER
-  wt_int<rrr_vector<63>> lcs;
+  sdsl::wt_int<sdsl::rrr_vector<63>> lcs;
   load_from_file(lcs, base_name + ".lcs");
 
   auto lcs_size = size_in_mega_bytes(lcs);
@@ -186,7 +180,7 @@ int main(int argc, char* argv[]) {
 
   mlockall(MCL_CURRENT);
   typedef chrono::nanoseconds unit;
-  string unit_s = " ns";
+  std::string unit_s = " ns";
 
   #ifndef VAR_ORDER // standard dbg
   // backward

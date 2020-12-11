@@ -1,30 +1,31 @@
-
 #include <iostream>
 #include <fstream>
 #include <utility>
 #include <ctime>
+#include <sys/timeb.h>
+#include <cstdio>
+#include <cstdlib>
+#include <libgen.h>
 
 // TCLAP
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
-#include <cstdio>
-
-#include <cstdlib>
-
-#include <libgen.h>
 
 // Custom Headers
 //#include "uint128_t.hpp"
 //#include "debug.h"
-#include "kmer.hpp"
+#include "kmer.hpp" //color_bv
 
-//using namespace std;
-//using namespace sdsl;
+typedef struct p
+{
+    std::string input_filename = "";
+    int num_colors;
+    unsigned long long m;
+    unsigned long long n;
+    std::string output_prefix = "";
+} parameters_t;
 
-#include <cstdlib>
-#include <sys/timeb.h>
-#include "pack-color.hpp"
 
 int getMilliCount()
 {

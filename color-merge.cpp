@@ -4,29 +4,31 @@
 #include <fstream>
 #include <utility>
 #include <ctime>
+#include <cstdio>
+#include <cstdlib>
+#include <libgen.h>
+
+#include <sys/timeb.h>
 
 // TCLAP
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
-#include <cstdio>
-
-#include <cstdlib>
-
-#include <libgen.h>
 
 // Custom Headers
-//#include "uint128_t.hpp"
-//#include "debug.h"
 #include "kmer.hpp"
-
-//using namespace std;
-//using namespace sdsl;
-
-#include <cstdlib>
-#include <sys/timeb.h>
-#include "color-merge.hpp"
 #include "SDIter.h"
+
+typedef struct p
+{
+    std::string plan_filename = "";
+    std::string matrix1_filename = "";
+    int num_colors1;
+    std::string matrix2_filename = "";
+    int num_colors2;
+    std::string output_prefix = "";
+} parameters_t;
+
 
 int getMilliCount()
 {
@@ -82,7 +84,6 @@ void deserialize_color_bv(std::ifstream &colorfile, color_bv &value)
 
 int main(int argc, char * argv[])
 {
-    const bool rrr = false;
     parameters_t params;
     parse_arguments(argc, argv, params);
 
@@ -122,14 +123,14 @@ int main(int argc, char * argv[])
     std::cerr << "builder size: " << b_builder->size() << " capacity: " << b_builder->capacity() << std::endl;
 
 
-    size_t color1_row = 0;
-    size_t color2_row = 0;
-    size_t output_row = 0;
+    ssize_t color1_row = 0;
+    ssize_t color2_row = 0;
+    ssize_t output_row = 0;
 
     
     char planstep = 0;
     while (planfile >> planstep) {
-        size_t next_pos = 0;        
+        ssize_t next_pos = 0;        
         if (planstep == 3) {
             next_pos = color1iter.peek();
             while (next_pos < (color1_row + 1) * params.num_colors1 && next_pos != -1) {
@@ -176,7 +177,7 @@ int main(int argc, char * argv[])
         }
     }
         
-    int sysTime = getMilliCount();
+    //int sysTime = getMilliCount();
     
 
         sdsl::sd_vector<> b(*b_builder);

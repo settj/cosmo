@@ -9,13 +9,9 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-#include "io.hpp"
 #include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
 #include "cosmo-color.hpp"
-
-//using namespace std;
-//using namespace sdsl;
+#include "kmer.hpp" //color_bv
 
 #include <sys/timeb.h>
 
@@ -66,7 +62,7 @@ void test_symmetry(debruijn_graph_shifted<> dbg) {
       ssize_t out = dbg.outgoing(in, y);
       if (out == -1)
 	continue;
-      cout << "Incoming " << in <<  ":" << out <<"\n";
+      std::cout << "Incoming " << in <<  ":" << out <<"\n";
     }
   }
 }
@@ -75,14 +71,14 @@ void test_symmetry(debruijn_graph_shifted<> dbg) {
 
 void dump_nodes(debruijn_graph_shifted<> dbg, uint64_t * colors) {
   for (size_t i = 0; i < dbg.num_nodes(); i++) {
-    cout << i << ":" << dbg.node_label(i) << colors[dbg._node_to_edge(i)] << "\n";
+    std::cout << i << ":" << dbg.node_label(i) << colors[dbg._node_to_edge(i)] << "\n";
   }
 }
 
 
 void dump_edges(debruijn_graph_shifted<> dbg, uint64_t * colors) {
   for (size_t i = 0; i < dbg.size(); i++) {
-    cout << i << "e:" << dbg.edge_label(i) << colors[i] << "\n";
+    std::cout << i << "e:" << dbg.edge_label(i) << colors[i] << "\n";
   }
 }
 
@@ -94,20 +90,20 @@ void print_color(color_bv& color)
     for (unsigned int first1 = 0; first1 < colstr.size() ; first1++) {
         if (colstr[first1] == '1') {
             std::string outstring = colstr.substr(first1, colstr.size());
-            cout << outstring;
+            std::cout << outstring;
             return;
         }
     }
-    cout << "0";
+    std::cout << "0";
 
 }
-void find_bubbles(const debruijn_graph_shifted<> &dbg, sd_vector<> &colors, color_bv color_mask1, color_bv color_mask2)
+void find_bubbles(const debruijn_graph_shifted<> &dbg, sdsl::sd_vector<> &colors, color_bv color_mask1, color_bv color_mask2)
 {
     int t = getMilliCount();
     int num_colors = colors.size() / dbg.size();
 
     sdsl::bit_vector visited = sdsl::bit_vector(dbg.num_nodes(), 0);
-    cout << "Starting to look for bubbles\n";
+    std::cout << "Starting to look for bubbles\n";
     std::vector<std::string> branch_labels(2);
 
     // for each candidate start nodein the graph
@@ -164,20 +160,20 @@ void find_bubbles(const debruijn_graph_shifted<> &dbg, sd_vector<> &colors, colo
                      (color_mask2 & branch_color[1]).any() && (~color_mask2 & branch_color[1]).none()) || 
                     ((color_mask1 & branch_color[1]).any() && (~color_mask1 & branch_color[1]).none() &&
                      (color_mask2 & branch_color[0]).any() && (~color_mask2 & branch_color[0]).none())) {
-                    cout << "\nStart flank: " << dbg.node_label(start_node) << " c: ";
+                    std::cout << "\nStart flank: " << dbg.node_label(start_node) << " c: ";
                     print_color ( branch_color[0]);
-                    cout << ":";
+                    std::cout << ":";
                     print_color( branch_color[1]);
-                    cout << "\n";
-                    cout << "Branch: " << branch_labels[0] << "\n";
-                    cout << "Branch: " << branch_labels[1] << "\n";
-                    cout << "End flank: " << dbg.node_label(end_nodes[0]) << "\n";
+                    std::cout << "\n";
+                    std::cout << "Branch: " << branch_labels[0] << "\n";
+                    std::cout << "Branch: " << branch_labels[1] << "\n";
+                    std::cout << "End flank: " << dbg.node_label(end_nodes[0]) << "\n";
 
                 }
             }
         }
     }
-    cerr << "Find bubbles time: " << getMilliSpan(t) << std::endl;
+    std::cerr << "Find bubbles time: " << getMilliSpan(t) << std::endl;
 }
 
 
@@ -185,24 +181,24 @@ void find_bubbles(const debruijn_graph_shifted<> &dbg, sd_vector<> &colors, colo
 int main(int argc, char* argv[]) {
   parameters_t p;
   parse_arguments(argc, argv, p);
-  cerr << "pack-color compiled with supported colors=" << NUM_COLS << std::endl;
+  std::cerr << "pack-color compiled with supported colors=" << NUM_COLS << std::endl;
   //ifstream input(p.input_filename, ios::in|ios::binary|ios::ate);
   // Can add this to save a couple seconds off traversal - not really worth it.
-  cerr << "loading dbg" << std::endl;
+  std::cerr << "loading dbg" << std::endl;
   debruijn_graph_shifted<> dbg;
-  load_from_file(dbg, p.input_filename);
+  sdsl::load_from_file(dbg, p.input_filename);
   //input.close();
-  cerr << "loading colors" << std::endl;
-  sd_vector<> colors;
-  load_from_file(colors, p.color_filename);
+  std::cerr << "loading colors" << std::endl;
+  sdsl::sd_vector<> colors;
+  sdsl::load_from_file(colors, p.color_filename);
 
-  cerr << "k             : " << dbg.k << endl;
-  cerr << "num_nodes()   : " << dbg.num_nodes() << endl;
-  cerr << "num_edges()   : " << dbg.num_edges() << endl;
-  cerr << "colors        : " << colors.size() / dbg.size() << endl; 
-  cerr << "Total size    : " << size_in_mega_bytes(dbg) << " MB" << endl;
-  cerr << "Bits per edge : " << bits_per_element(dbg) << " Bits" << endl;
-  cerr << "Color size    : " << size_in_mega_bytes(colors) << " MB" << endl;
+  std::cerr << "k             : " << dbg.k << std::endl;
+  std::cerr << "num_nodes()   : " << dbg.num_nodes() << std::endl;
+  std::cerr << "num_edges()   : " << dbg.num_edges() << std::endl;
+  std::cerr << "colors        : " << colors.size() / dbg.size() << std::endl; 
+  std::cerr << "Total size    : " << sdsl::size_in_mega_bytes(dbg) << " MB" << std::endl;
+  std::cerr << "Bits per edge : " << bits_per_element(dbg) << " Bits" << std::endl;
+  std::cerr << "Color size    : " << sdsl::size_in_mega_bytes(colors) << " MB" << std::endl;
 
   //dump_nodes(dbg, colors);
   //dump_edges(dbg, colors);

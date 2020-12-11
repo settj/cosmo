@@ -2,24 +2,24 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <libgen.h> // basename
 
 #include "tclap/CmdLine.h"
+
+#include <boost/dynamic_bitset.hpp>
 
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-#include "io.hpp"
+#include "config.hpp" //kmer_t
 #include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
-#include "vari-merge.hpp"
-#include "sort.hpp"
-#include <boost/dynamic_bitset.hpp>
-//using namespace std;
-//using namespace sdsl;
+#include "sort.hpp" //make_dbg
 
 #include <sys/timeb.h>
 
+struct parameters_t {
+  std::string input_filename = "";
+  std::string input_filename2 = "";    
+};
 
 int getMilliCount(){
   timeb tb;
@@ -148,7 +148,7 @@ uint64_t maxsize(const std::vector<bool> &sets)
 //    return sum + length(pos, sets);
 }
 
-int subdivide2(const std::vector<unsigned char> &g1_col, const uint64_t g1_ptr, const uint64_t g1_num,
+void subdivide2(const std::vector<unsigned char> &g1_col, const uint64_t g1_ptr, const uint64_t g1_num,
               const std::vector<unsigned char> &g2_col, const uint64_t g2_ptr, const uint64_t g2_num,
               /*const int colno,*/ std::vector<bool> &g1_out_set, std::vector<bool> &g2_out_set, int &active_alpha_size)
 {
@@ -306,8 +306,8 @@ int refine_sets(const std::vector<unsigned char> &g1_col, const std::vector<unsi
         //std::cout << std::endl << "\t" << g2_ptr << ":+" << g2_num;
         //dump_range(g2_ptr, g2_ptr+ g2_num, g2_col);
         //std::cout <<std::endl;
-        uint64_t g1_out_set_initsize = g1_out_set.size();
-        uint64_t g2_out_set_initsize = g2_out_set.size();
+        //uint64_t g1_out_set_initsize = g1_out_set.size();
+        //uint64_t g2_out_set_initsize = g2_out_set.size();
 //         std::vector<bool> g1t1,g2t1,g1t2,g2t2;
 //         subdivide(g1_col, g1_ptr, g1_num,
 //                   g2_col, g2_ptr, g2_num,
@@ -453,7 +453,7 @@ void fill_Lcol(const debruijn_graph_shifted<> &g, std::vector<bool> &Lcol)
 
 char combine(char symbol, bool flag)
 {
-    char encoded;
+    char encoded = 0;
     switch(symbol) {
     case '$' : encoded = 0;
         break;
@@ -493,8 +493,8 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
     //assert(g1.k == 10); // FIXME: remove after prototyping, just want to make sure behavior matches Debby's
     
 
-    std::vector<int> cols;  // column iteration order, counting columns from the right
-    for (int i = 1; i < g1.k ; ++i) {
+    std::vector<unsigned int> cols;  // column iteration order, counting columns from the right
+    for (unsigned int i = 1; i < g1.k ; ++i) {
         cols.push_back(i);
     }
     cols.push_back(0);
@@ -531,14 +531,14 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
     std::cerr << "caching node flags for g1" << std::endl << std::flush;
     int startgettime3 = getMilliCount();
     size_t num_set1 = g1.get_node_flags(g1_node_flags);
-    int delta3 = getMilliSpan(startgettime);
+    int delta3 = getMilliSpan(startgettime3);
     std::cerr << "got  " << num_set1 << ", reported " <<g1_node_flags.count() << " bits  in g1_node_flags in " << delta3 << " milliseconds." << std::endl << std::flush;
 
 
     std::cerr << "caching node flags for g2" << std::endl << std::flush;
     int startgettime4 = getMilliCount();
      size_t num_set2 =    g2.get_node_flags(g2_node_flags);
-    int delta4 = getMilliSpan(startgettime);
+    int delta4 = getMilliSpan(startgettime4);
     std::cerr << "got " << num_set2 << ", reported " << g2_node_flags.count() << " bits in g2_node_flags in " << delta4 << " milliseconds." << std::endl << std::flush;
 
 
@@ -676,7 +676,7 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
 
     // BEGIN output stuff
 
-    typedef wt_huff<rrr_vector<63>> wt_t;
+    typedef sdsl::wt_huff<sdsl::rrr_vector<63>> wt_t;
     wt_t edges;
     std::string outfile("merged");
     string temp_edge_file = outfile + ".w.temp";
@@ -689,7 +689,7 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
 //    stxxl::vector<uint8_t> * output = new stxxl::vector<uint8_t>(&edge_file);
     std::cerr << "Creating writer bound to vector " << std::endl << std::flush;
     //  typename stxxl::vector<uint8_t>::bufwriter_type * edge_writer = new stxxl::vector<uint8_t>::bufwriter_type(*output);
-    char w_idx = 0;
+    //char w_idx = 0;
     std::cerr << "writing to writer " << std::endl << std::flush;    
 
     // END output stuff
@@ -783,7 +783,7 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
     std::cerr << "constructing wavelet tree " << std::endl << std::flush;
     ef.close();
     
-    construct(edges, temp_edge_file, 1);
+    sdsl::construct(edges, temp_edge_file, 1);
     std::cerr << "closing file " << std::endl << std::flush;    
 //    edge_file.close_remove();
 
@@ -802,7 +802,7 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
     for (size_t i = 0; i < L.size(); i++)
         if (L[i]) b_builder->set(i);
         
-    sd_vector<> node_bv(*b_builder);
+    sdsl::sd_vector<> node_bv(*b_builder);
     delete b_builder;
     array<size_t, 5> counts{
         ntcounts['$'] ,
@@ -811,8 +811,8 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
                   ntcounts['$'] + ntcounts['A'] + ntcounts['C'] + ntcounts['G']  ,
             ntcounts['$'] + ntcounts['A'] + ntcounts['C'] + ntcounts['G']  + ntcounts['T'] };
 //        0,0,0,0,0};
-    sd_vector<> dum_pos_bv;
-    vector<kmer_t> dummies;
+    sdsl::sd_vector<> dum_pos_bv;
+    std::vector<kmer_t> dummies;
     debruijn_graph_shifted<> dbgm = cosmo::make_dbg<debruijn_graph_shifted<>>()(g1.k, node_bv, edges, counts, "$ACGT", dum_pos_bv, dummies);
     cerr << "k             : " << dbgm.k << endl;
     cerr << "num_nodes()   : " << dbgm.num_nodes() << endl;
@@ -830,7 +830,7 @@ int mainmerge(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<>
 
 void dumpcolumns( const debruijn_graph_shifted<> &dbg, const  parameters_t &p)
 {
-    for (int i = 0; i < dbg.k; ++i) {
+    for (unsigned int i = 0; i < dbg.k; ++i) {
         std::stringstream fname;
         fname <<  p.input_filename;
         fname << i;
@@ -850,7 +850,7 @@ void dumpcolumns( const debruijn_graph_shifted<> &dbg, const  parameters_t &p)
     //     g_col.push_back(c);
     std::vector<unsigned char> g_col(dbg.num_edges());    
     dbg.get_edges(g_col);
-    for (int i = 1; i < dbg.k; ++i) {
+    for (unsigned int i = 1; i < dbg.k; ++i) {
         std::stringstream fname;
         fname <<  p.input_filename;
         fname << ".new";
@@ -892,14 +892,14 @@ int main(int argc, char* argv[]) {
 
     // dumpcolumns(dbg, p);
     // dump_edges(dbg);
-    cerr << "k             : " << dbg.k << endl;
-    cerr << "num_nodes()   : " << dbg.num_nodes() << endl;
-    cerr << "num_edges()   : " << dbg.num_edges() << endl;
-    cerr << "Total size    : " << size_in_mega_bytes(dbg) << " MB" << endl;
-    cerr << "Bits per edge : " << bits_per_element(dbg) << " Bits" << endl;
+    cerr << "k             : " << dbg2.k << endl;
+    cerr << "num_nodes()   : " << dbg2.num_nodes() << endl;
+    cerr << "num_edges()   : " << dbg2.num_edges() << endl;
+    cerr << "Total size    : " << size_in_mega_bytes(dbg2) << " MB" << endl;
+    cerr << "Bits per edge : " << bits_per_element(dbg2) << " Bits" << endl;
 
-    std::vector<unsigned char> last;
-    std::vector<unsigned char>* cur = &last;
+    //std::vector<unsigned char> last;
+    //std::vector<unsigned char>* cur = &last;
     //  dbg.get_edge_column(last);
   
 //    for (int i = 0; i < dbg.k; ++i);

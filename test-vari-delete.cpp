@@ -1,32 +1,19 @@
-#include <algorithm>
 #include <iostream>
-#include <fstream>
-#include <unordered_map>
-#include <vector>
 #include <string>
-
 #include <sys/timeb.h>
+#include <vector>
 
-#include <boost/dynamic_bitset.hpp>
+#include "tclap/CmdLine.h" //parse args
 
-#include "tclap/CmdLine.h"
-
-#include "config.hpp"
-#include "debruijn_graph_shifted.hpp"
-//#include "SDIter.h"
 #include "sort.hpp"
 
-typedef stxxl::vector<kmer_t,   1, stxxl::lru_pager<8>, block_size>   kmer_vector_t;
-
-struct parameters_t {
-  std::string input_filename = "";
-  std::string input_filename2 = "";    
-  std::string matrix_filename = "";    
-  int num_colors = 0;    
-  int colors_start = 0;    
-  int colors_end = 0;    
-  std::string kmers_filename = "";
+struct test_vd_parameters_t {
+    std::string target_filename = "";
+    std::string input_filename = "";    
 };
+
+
+//shit i needed from vari-delete.cpp because the build process is so fucked i can't link vari-delete.
 
 int getMilliCount(){
     timeb tb;
@@ -42,36 +29,6 @@ int getMilliSpan(int nTimeStart){
         nSpan += 0x100000 * 1000;
     return nSpan;
 }
-
-void parse_arguments(int argc, char **argv, parameters_t & params)
-{
-    TCLAP::CmdLine cmd(BANNER, ' ', VERSION);
-    TCLAP::UnlabeledValueArg<std::string> input_filename_arg("input", ".dbg file.", true, "", "graph_file", cmd);
-    TCLAP::UnlabeledValueArg<std::string> input_filename2_arg("input2", ".dbg file.", true, "", "graph_file", cmd);
-    TCLAP::UnlabeledValueArg<std::string> matrix_filename_arg("matrix", "Matrix file. Currently only supports DSK's binary format (for k<=64).", true, "", "matrix_file", cmd);
-    TCLAP::UnlabeledValueArg<std::string> num_colors_arg("num_colors", "Number of colors", true, "", "num colors", cmd);
-    TCLAP::UnlabeledValueArg<std::string> colors_start_arg("colors_start", "Position in color matrix where deleted graph's colors start", true, "", "colors start", cmd);
-    TCLAP::UnlabeledValueArg<std::string> colors_end_arg("colors_end", "Position in color matrix where deleted graph's colors end", true, "", "colors end", cmd);
-    TCLAP::UnlabeledValueArg<std::string> kmers_filename_arg("kmers", "list of kmers file.", true, "", "kmer_file", cmd);
-    cmd.parse( argc, argv );
-
-    params.input_filename  = input_filename_arg.getValue();
-    params.input_filename2  = input_filename2_arg.getValue();
-    params.matrix_filename  = matrix_filename_arg.getValue();
-    params.num_colors = atoi(num_colors_arg.getValue().c_str());
-    params.colors_start = atoi(colors_start_arg.getValue().c_str());
-    params.colors_end = atoi(colors_end_arg.getValue().c_str());
-    params.kmers_filename  = kmers_filename_arg.getValue();
-}
-
-
-void dump_edges(const debruijn_graph_shifted<> &dbg) {
-    for (size_t i = 0; i < dbg.size(); i++) {
-        cout <<  /* << "e:" <<*/ dbg.edge_label(i) << std::endl;
-    }
-}
-
-
 
 
 // Returns the number of 0's in a run beginning at set_start
@@ -107,17 +64,6 @@ uint64_t num_sets_ge(const uint64_t set_start, const std::vector<bool> &sets)
     return count + 1;
 
 }
-
-template<class E>
-int dump_range(const uint64_t start, const uint64_t end, const std::vector<E> &col)
-{
-    std::cout << "[";
-    for (uint64_t i = start; i < end; ++i)
-        std::cout << col[i] << ", ";
-    std::cout << "]";
-    return 0;
-}
-
 
 uint64_t num_sets(const std::vector<bool> &sets)
 {
@@ -247,60 +193,6 @@ void subdivide2(const std::vector<unsigned char> &g1_col, const uint64_t g1_ptr,
     active_alpha_size = chars_seen;
 
     // if c1 is empty
-}
-
-//FIXME: this is pretty inefficient; we should be able to scan through the columns only once
-int subdivide(const std::vector<unsigned char> &g1_col, const uint64_t g1_ptr, const uint64_t g1_num,
-              const std::vector<unsigned char> &g2_col, const uint64_t g2_ptr, const uint64_t g2_num,
-              /*const int colno,*/ std::vector<bool> &g1_out_set, std::vector<bool> &g2_out_set, int &active_alpha_size)
-{
-    // build a set of used characters for g1 within a window in g1
-    std::set<char> g1_chars;
-    for (uint64_t i = 0; i <  g1_num; ++i) {
-        g1_chars.insert(g1_col[g1_ptr + i]);
-    }
-
-    // build a set of used characters for g2 within a window in g2
-    std::set<char> g2_chars;    
-    for (uint64_t i = 0; i <  g2_num; ++i) {
-        g2_chars.insert(g2_col[g2_ptr +i]);
-    }
-
-    // generate the union 
-    std::vector<unsigned char> g1_g2_union;
-    std::set_union(g1_chars.begin(), g1_chars.end(),
-                   g2_chars.begin(), g2_chars.end(),                  
-                   std::back_inserter(g1_g2_union));
-    
-    // # for each $ in column, if the corresponding edge label exists in the other set, we can delete it
-            
-    // for letter in active_alphabet:
-     for (auto letter: g1_g2_union) {
-         g1_out_set.insert(g1_out_set.end(), 
-                           count_if (g1_col.begin()+g1_ptr, g1_col.begin()+g1_ptr+g1_num/*+1*/,  [letter](char i){return i  == letter;}),
-                           false);
-         g1_out_set.push_back(true);
-         g2_out_set.insert(g2_out_set.end(), 
-                           count_if (g2_col.begin()+g2_ptr, g2_col.begin()+g2_ptr+g2_num/*+1*/,  [letter](char i){return i  == letter;}),
-                           false);
-         g2_out_set.push_back(true);
-     }
-     active_alpha_size = g1_g2_union.size();
-     return 0;
-}
-
-void dumprange(const std::vector<unsigned char> &g1_col, size_t a, size_t b)
-{
-    for (size_t i = a; i < a+b; i++)
-        std::cout << g1_col[i];
-    std::cout <<std::endl;
-}
-
-void dumpboolrange(const std::vector<bool> &g1_col, size_t a, size_t b)
-{
-    for (size_t i = a; i < a+b; i++)
-        std::cout << (int)g1_col[i];
-    std::cout <<std::endl;
 }
 
 int refine_sets(const std::vector<unsigned char> &g1_col, const std::vector<unsigned char> &g2_col, /*const std::vector<unsigned char> &test_g2_col,*/
@@ -503,59 +395,54 @@ char combine(char symbol, bool flag)
                     
 }
 
-bool curr_label_precedes_node_label(std::string& dummy_label, std::string node_label) {
+bool curr_label_precedes_node_label_2(std::string& dummy_label, int dummy_label_idx, std::string node_label) {
 
     std::cout << "comparing for preceding with " << node_label << std::endl;
-    int idx = node_label.length()-1;
-    while(idx >= 0) {
-        if(dummy_label.at(idx) < node_label[idx]) {
+    int node_label_idx = node_label.length()-1;
+    while(dummy_label_idx > 0) {
+        if(dummy_label.at(dummy_label_idx) < node_label[node_label_idx]) {
             return true;
         }
-        else if(dummy_label.at(idx) > node_label[idx]) {
-            return false;
-        }
 
-        --idx;
+        --dummy_label_idx;
+        --node_label_idx;
     }
 
     return false;
 }
 
-/*
- * Record where incoming chain of dummies should be inserted to give difference graph proper BOSS structure. 
- *
- * Idea is to go backwards in the minuend graph, and use the corresponding EBWT chars as the dummy EBWT chars. 
- *
- * Inputs:
- *      edges: EBWT obtained from execution
- *      L: accessory data structure obtained from execution
- *      ntcounts: accessory data structure obtained from execution
- *      edge_mapping: maps edges in minuend graph to corresponding edge in difference graph
- *      g1: minuend de Bruijn graph (graph we are deleting from)
- *      dummies_to_insert: insert dummy into here for later insertion into difference graph EBWT. map from edge location to a
- *                         pair consisting of: dummy string and dummy EBWT char
- */
-void insert_incoming_dummy_chain(std::vector<char>& edges, std::vector<bool>& L, std::map<char, uint64_t>& ntcounts,
-                                 std::vector<ssize_t>& edge_mapping, size_t edge_idx, const debruijn_graph_shifted<>& g1,
-                                 std::unordered_multimap<ssize_t, std::pair<std::string, char> >& dummies_to_insert) {
+bool curr_label_precedes_node_label(std::string& dummy_label, int dummy_label_idx, std::string node_label) {
+
+    std::cout << "comparing for preceding with " << node_label << std::endl;
+    if(dummy_label_idx < 2) { return true; }
+
+    int node_label_idx = node_label.length()-1;
+    while(dummy_label_idx > 0) {
+        if(dummy_label.at(dummy_label_idx) < node_label[node_label_idx]) {
+            return true;
+        }
+
+        --dummy_label_idx;
+        --node_label_idx;
+    }
+
+    return false;
+}
+
+void insert_incoming_dummy_chain(std::vector<char>& edges, std::vector<bool>& L, std::map<char, uint64_t>& ntcounts, std::vector<ssize_t>& edge_mapping, size_t edge_idx, const debruijn_graph_shifted<>& g1, std::unordered_multimap<ssize_t, std::pair<std::string, char> >& dummies_to_insert) {
     int k = g1.k;
     char ebwt_char;
     //size_t edge_idx = g1._node_to_edge(i);
-    //std::cout << g1.edge_label(edge_idx) << " is full edge label. " << std::endl;
+    std::cout << g1.edge_label(edge_idx) << " is full edge label. " << std::endl;
     std::string full_edge_label = g1.edge_label(edge_idx);
-
 
     ssize_t mapped_edge_idx;
     for(int i=1; i < k-1; ++i) {
+        ebwt_char = g1._map_symbol(g1._symbol_access(edge_idx));
+        edge_idx = g1._backward(edge_idx);
+        ntcounts[g1._map_symbol(g1._symbol_access(edge_idx))] += 1; //Go ahead and update counts before edge_idx is modified in map loop
+        std::cout << g1.edge_label(edge_idx) << " is " << i << "th edge label" << std::endl;
 
-        ebwt_char = g1._map_symbol(g1._symbol_access(edge_idx)); //Get dummy ebwt char from minuend graph 
-        edge_idx = g1._backward(edge_idx); //Go ahead and move backwards now
-
-        //EBWT char of backward edge is last char of node
-        ntcounts[g1._map_symbol(g1._symbol_access(edge_idx))] += 1; //Go ahead and update counts 
-        //std::cout << g1.edge_label(edge_idx) << " is " << i << "th edge label" << std::endl;
-
-        //Convert ascii to alphabet char
         switch(ebwt_char) {
             case '$' : ebwt_char = 0; //std::cout << "0" << std::endl;
                 break;
@@ -569,81 +456,38 @@ void insert_incoming_dummy_chain(std::vector<char>& edges, std::vector<bool>& L,
                 break;
         }
 
-        //search in order to identify the edge in the original graph before which the dummy should be inserted, then do mapping
-        //
-        //edge we want is between the first instance of this char in EBWT and the current edge
-        char sorted_col_char = g1._symbol_access(edge_idx);
-        //std::cout << "sorted col char: " << (sorted_col_char >> 1) << std::endl;
-        size_t lower_node_bound = g1._edge_to_node(g1._symbol_start(sorted_col_char));
+        //do the correct search in order to identify the edge in the original graph before which the dummy
+        //should be inserted, then do mapping
+        char sorted_col_char = g1._map_symbol(g1._symbol_access(edge_idx));
+        std::cout << "sorted col char: " << sorted_col_char << std::endl;
+        size_t lower_node_bound = g1._symbol_start(sorted_col_char);
         size_t upper_node_bound = g1._edge_to_node(edge_idx);
-        //std::cout << "looking in: [" << lower_node_bound << ", " << upper_node_bound << "]" << std::endl;
+        size_t chosen_node=0;
 
-        //Get dummy kmer for inserting into multimap
-        std::string kmer = std::string(i, '$') + full_edge_label.substr(0, k-i);
-
-        //If this does not find a node, then we insert after the upper bound
-        size_t chosen_node=upper_node_bound+1;
+        //TODO make sure chosen node will be found no matter what
         for(size_t j=lower_node_bound; j<=upper_node_bound; ++j) {
-            //For each node, compare the dummy k-1 prefix to see comes before it colexicographically
-
-            std::string node_label = g1.node_label(j);
-            int idx = node_label.length()-1;
-            //std::cout << "comparing " << kmer << " with " << node_label << std::endl;
-            bool dummy_less_than_node = true;
-            while(idx >= 0) {
-                //std::cout << kmer.at(idx) << " vs " << node_label[idx] << std::endl;
-                if(kmer[idx] < node_label[idx]) {
-                    //Node label precedes dummy kmer
-                    break;
-                }
-                else if(kmer[idx] > node_label[idx]) {
-                    //Dummy kmer preceds node label
-                    dummy_less_than_node = false;
-                    break;
-                }
-
-                --idx;
-            }
-
-            //This is the node we want to insert before
-            if(dummy_less_than_node) {
+            if(curr_label_precedes_node_label(full_edge_label, i, g1.node_label(j))) {
                 chosen_node = j;
-
-                //If the node was exactly identical, then the dummy was in the minuend...TODO what do
-                if(idx == -1) {
-                    std::cout << "nodes identical!!!!" << g1.edge_label(g1._node_to_edge(chosen_node)) << std::endl;
-                }
                 break;
             }
         }
 
-        //std::cout << "chosen node, chosen edge: " << chosen_node << ", " << g1.edge_label(g1._node_to_edge(chosen_node)) << std::endl;
-
-        //Not sure this loop is needed anymore, but here we get the edge in the difference graph from minuend graph edge
+        std::cout << "chosen node, chosen edge: " << chosen_node << ", " << g1._node_to_edge(chosen_node) << std::endl;
         size_t chosen_edge = g1._node_to_edge(chosen_node);
         mapped_edge_idx = edge_mapping.at(chosen_edge);
-        //std::cout << mapped_edge_idx << " is original mapped edge idx" << std::endl;
+        std::cout << mapped_edge_idx << " is original mapped edge idx" << std::endl;
         while(mapped_edge_idx == -1) {
             ++chosen_edge;
             mapped_edge_idx = edge_mapping.at(chosen_edge);
-            //std::cout << mapped_edge_idx << " is potential actually mapped edge idx" << std::endl;
+            std::cout << mapped_edge_idx << " is potential actually mapped edge idx" << std::endl;
         }
-        //std::cout << mapped_edge_idx << " is mapped edge idx we are going to use" << std::endl;
+        std::cout << mapped_edge_idx << " is mapped edge idx we are going to use" << std::endl;
 
-        //See if this dummy has already been inserted into the difference graph
-        //std::cout << kmer << " is " << (i) << "th dummy kmer" << std::endl;
+
+        //Input right character from node label in edges, '0' in L (and modify next maybe?), add to ntcounts['$']
+        std::string kmer = std::string(k-i-1, '$') + full_edge_label.substr(0, i);
+        std::cout << kmer << " is " << (k-i-1) << "th dummy kmer" << std::endl;
         std::pair<std::string, char> dummy_kmer_char(kmer, ebwt_char);
-        auto eq_range = dummies_to_insert.equal_range(mapped_edge_idx);
-        for(auto itr=eq_range.first; itr!= eq_range.second; ++itr) {
-            std::cout << (*itr).second.first << " : " << (*itr).second.second << std::endl;
-            if((*itr).second == dummy_kmer_char) {
-                //If the dummy is a duplicate, so are all other incoming dummies we would insert after this, so return
-                std::cout << "duplicate" << std::endl;
-                return;
-            }
-        }
-
-        //Record, using edge index as key, dummy kmer and EBWT char
         dummies_to_insert.insert(std::pair<ssize_t, std::pair<std::string, char> >(mapped_edge_idx, dummy_kmer_char));
         //std::cout << "incoming dummy edge at " << mapped_edge_idx << std::endl;
         //edges.insert(edges.begin() + mapped_edge_idx, (ebwt_char << 1));
@@ -651,189 +495,105 @@ void insert_incoming_dummy_chain(std::vector<char>& edges, std::vector<bool>& L,
 
     }
 
-    //std::cout << "edges before inserting very first dummy:" << std::endl;
-    //for(size_t i=0; i < edges.size(); ++i) {
-        //std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
-    //}
-
-    //Insert dummy edge with k-1 $'s and one char
+    std::cout << "edges before inserting very first dummy:" << std::endl;
+    for(size_t i=0; i < edges.size(); ++i) {
+        std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
+    }
+    //First, see if node consisting of all dummies exists. If not, insert it.
     //std::cout << "inserting dummy node first!!! " << std::endl;
-    //std::cout << g1.edge_label(edge_idx) << " is last edge label" << std::endl;
     ebwt_char = g1._map_symbol(g1._symbol_access(edge_idx));
 
     switch(ebwt_char) {
-    case '$' : ebwt_char = 0; std::cout << "0" << std::endl;
+    case '$' : ebwt_char = 0; //std::cout << "0" << std::endl;
         break;
-    case 'A' : ebwt_char = 1; std::cout << "1" << std::endl;
+    case 'A' : ebwt_char = 1; //std::cout << "1" << std::endl;
         break;
-    case 'C' : ebwt_char = 2; std::cout << "2" << std::endl;
+    case 'C' : ebwt_char = 2; //std::cout << "2" << std::endl;
         break;
-    case 'G': ebwt_char = 3; std::cout << "3" << std::endl;
+    case 'G': ebwt_char = 3; //std::cout << "3" << std::endl;
         break;
-    case 'T': ebwt_char = 4; std::cout << "4" << std::endl;
+    case 'T': ebwt_char = 4; //std::cout << "4" << std::endl;
         break;
     }
 
 
-    //search in order to identify the edge in the original graph before which the dummy should be inserted.
-    //same as before
-    char sorted_col_char = 0;//g1._symbol_access(edge_idx);
-    //std::cout << "sorted col char: " << (sorted_col_char >> 1) << std::endl;
-    size_t lower_node_bound = g1._edge_to_node(g1._symbol_start(sorted_col_char));
-    size_t upper_node_bound = g1._edge_to_node(g1._symbol_start(1));
-    size_t chosen_node=upper_node_bound+1;
-    //std::cout << "looking in: [" << lower_node_bound << ", " << upper_node_bound << "]" << std::endl;
-
-    std::string kmer = std::string(k-1, '$') + full_edge_label.substr(0, 1);
-
-    for(size_t j=lower_node_bound; j<=upper_node_bound; ++j) {
-        std::string node_label = g1.node_label(j);
-        int idx = node_label.length()-1;
-        std::cout << "comparing " << kmer << " with " << node_label << std::endl;
-        bool dummy_less_than_node = true;
-        while(idx >= 0) {
-            std::cout << kmer.at(idx) << " vs " << node_label[idx] << std::endl;
-            if(kmer[idx] < node_label[idx]) {
-                break;
-            }
-            else if(kmer[idx] > node_label[idx]) {
-                dummy_less_than_node = false;
-                break;
-            }
-
-            --idx;
+    int offset = 0;
+    bool insert = true;
+    for(size_t i=0; i < ntcounts['$']; ++i) {
+        if( (edges.at(i) >> 1) < ebwt_char ) {
+            std::cout << (edges.at(i) >> 1) << " " << ebwt_char << " means add to offset " << std::endl;
+            
+            ++offset;
         }
-
-        if(dummy_less_than_node) {
-            chosen_node = j;
-            if(idx == -1) {
-                std::cout << "nodes identical!!!!" << g1.edge_label(g1._node_to_edge(chosen_node)) << std::endl;
-            }
+        else if( (edges.at(i) >> 1) == ebwt_char ) {
+            insert = false;
             break;
         }
     }
 
-    //std::cout << "chosen node, chosen edge: " << chosen_node << ", " << g1.edge_label(g1._node_to_edge(chosen_node)) << std::endl;
-    size_t chosen_edge = g1._node_to_edge(chosen_node);
-    mapped_edge_idx = edge_mapping.at(chosen_edge);
-    //std::cout << mapped_edge_idx << " is original mapped edge idx" << std::endl;
-    while(mapped_edge_idx == -1) {
-        ++chosen_edge;
-        mapped_edge_idx = edge_mapping.at(chosen_edge);
-        //std::cout << mapped_edge_idx << " is potential actually mapped edge idx" << std::endl;
-    }
-    //std::cout << mapped_edge_idx << " is mapped edge idx we are going to use" << std::endl;
-
-
-    //Check for duplicate
-    //std::cout << kmer << " is " << "last dummy kmer" << std::endl;
-    std::pair<std::string, char> dummy_kmer_char(kmer, ebwt_char);
-    auto eq_range = dummies_to_insert.equal_range(mapped_edge_idx);
-    for(auto itr=eq_range.first; itr!= eq_range.second; ++itr) {
-        //std::cout << (*itr).second.first << " : " << (*itr).second.second << std::endl;
-        if((*itr).second == dummy_kmer_char) {
-            //If duplicate, nothing more to do
-            //std::cout << "duplicate" << std::endl;
-            return;
-        }
+    if(insert) {
+        //std::cout << "inserting into beginning of eges with offset: " << offset << std::endl;
+        //edges.insert(edges.begin() + offset, (ebwt_char << 1));
+        //L.insert(L.begin(), false);
+        ntcounts['$'] += 1;
+        std::string kmer = std::string(k-1, '$') + full_edge_label[k-1];
+        std::pair<std::string, char> dummy_kmer_char(kmer, ebwt_char);
+        dummies_to_insert.insert(std::pair<ssize_t, std::pair<std::string, char> >(offset, dummy_kmer_char));
     }
 
-    //Record, using edge index as key, dummy kmer and EBWT char
-    dummies_to_insert.insert(std::pair<ssize_t, std::pair<std::string, char> >(mapped_edge_idx, dummy_kmer_char));
-    //std::cout << "incoming dummy edge at " << mapped_edge_idx << std::endl;
-    //edges.insert(edges.begin() + mapped_edge_idx, (ebwt_char << 1));
-    //L.insert(L.begin() + mapped_edge_idx, false);
+    //std::cout << "edges after inserting very first dummy:" << std::endl;
+    //for(size_t i=0; i < edges.size(); ++i) {
+        //std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
+    //}
 }
 
-/*
- * Record where outgoing dummy should be inserted to give difference graph proper BOSS structure. 
- *
- * Idea here is to 
- *
- * Inputs:
- *      edges: EBWT obtained from execution
- *      L: accessory data structure obtained from execution
- *      ntcounts: accessory data structure obtained from execution
- *      edge_mapping: maps edges in minuend graph to corresponding edge in difference graph
- *      g1: minuend de Bruijn graph (graph we are deleting from)
- *      dummies_to_insert: insert dummy into here for later insertion into difference graph EBWT. map from edge location to a
- *                         pair consisting of: dummy string and dummy EBWT char
- */
-
-void insert_outgoing_dummy(std::vector<char>& edges, std::vector<bool>& L, std::map<char, uint64_t>& ntcounts,
-                           std::vector<ssize_t>& edge_mapping, size_t edge_idx, const debruijn_graph_shifted<>& g1,
-                           std::unordered_multimap<ssize_t, std::pair<std::string, char> >& dummies_to_insert) { 
+void insert_outgoing_dummy(std::vector<char>& edges, std::vector<bool>& L, std::map<char, uint64_t>& ntcounts, std::vector<ssize_t>& edge_mapping, size_t edge_idx, const debruijn_graph_shifted<>& g1, std::unordered_multimap<ssize_t, std::pair<std::string, char> >& dummies_to_insert) { //, std::map<size_t) {
     //Determine where to put dummy edge in new graph based on mapping of indices of outgoing edges of node in g1
     //size_t edge_idx = g1._node_to_edge(i);
-    ntcounts[g1._map_symbol(g1._symbol_access(edge_idx))] += 1; //go ahead and increment the count here
+    ntcounts[g1._map_symbol(g1._symbol_access(edge_idx))] += 1; //go ahead and increment the count here before edge_idx is modified in loop
 
     std::string full_edge_label = g1.edge_label(edge_idx);
-    //std::cout << "EDGE: " << full_edge_label << std::endl;
-    //
-
-    //Need to find where to insert the outgoing dummy
-    //char sorted_col_char = g1._map_symbol(g1._symbol_access(edge_idx));
-
-    //Character in sorted column of dbg (the last character of the node) of the outgoing dummy is this edge's EBWT char
-    char sorted_col_char = g1._symbol_access(edge_idx);
-    //std::cout << "sorted col char: " << (sorted_col_char >> 1) << std::endl;
-    //std::cout << "sorted col char C: " << g1._edge_to_node(g1._symbol_start('C')) << std::endl;
-    size_t lower_node_bound = g1._edge_to_node(g1._symbol_start(sorted_col_char));
+    //do the correct search in order to identify the edge in the original graph before which the dummy
+    //should be inserted, then do mapping
+    char sorted_col_char = g1._map_symbol(g1._symbol_access(edge_idx));
+    std::cout << "sorted col char: " << sorted_col_char << std::endl;
+    size_t lower_node_bound = g1._symbol_start(sorted_col_char);
     size_t upper_node_bound = g1._edge_to_node(edge_idx);
-    size_t chosen_node=upper_node_bound+1;
+    size_t chosen_node=0;
 
-    //std::cout << "looking in: [" << lower_node_bound << ", " << upper_node_bound << "]" << std::endl;
+    //TODO make sure chosen node will be found no matter what
     for(size_t j=lower_node_bound; j<=upper_node_bound; ++j) {
-        //Check if dummy label precedes the current node label, if so we want to insert here
-        if(curr_label_precedes_node_label(full_edge_label, g1.node_label(j))) {
+        if(curr_label_precedes_node_label_2(full_edge_label, g1.k-2, g1.node_label(j))) {
             chosen_node = j;
             break;
         }
     }
 
-    //Go from chosen node to chosen edge using edge_mapping TODO remove while loop, should be extraneous?
-    //std::cout << "chosen node, chosen edge: " << chosen_node << ", " << g1._node_to_edge(chosen_node) << std::endl;
+    std::cout << "chosen node, chosen edge: " << chosen_node << ", " << g1._node_to_edge(chosen_node) << std::endl;
     size_t chosen_edge = g1._node_to_edge(chosen_node);
     ssize_t mapped_edge_idx = edge_mapping.at(chosen_edge);
-    //std::cout << mapped_edge_idx << " is original mapped edge idx" << std::endl;
+    std::cout << mapped_edge_idx << " is original mapped edge idx" << std::endl;
     while(mapped_edge_idx == -1) {
         ++chosen_edge;
         mapped_edge_idx = edge_mapping.at(chosen_edge);
         std::cout << mapped_edge_idx << " is potential actually mapped edge idx" << std::endl;
     }
-    //std::cout << mapped_edge_idx << " is mapped edge idx we are going to use" << std::endl;
+    std::cout << mapped_edge_idx << " is mapped edge idx we are going to use" << std::endl;
 
 
+    //Input '$' in edges, '0' in L (and modify next maybe?)
+    //
+    //TODO actually track where edges are inserted; adding one will only work for this current test 2/5/2020
     std::string kmer = g1.edge_label(edge_idx);
     kmer = kmer.substr(0, kmer.size()-1) + "$";
-    //std::cout << kmer << " is dummy kmer" << std::endl;
     std::pair<std::string, char> dummy_kmer_and_char(kmer, 0);
-
-    //Check for duplicate
-    auto eq_range = dummies_to_insert.equal_range(mapped_edge_idx);
-    for(auto itr=eq_range.first; itr!= eq_range.second; ++itr) {
-        //std::cout << (*itr).second.first << " : " << (*itr).second.second << std::endl;
-        if((*itr).second == dummy_kmer_and_char) {
-            //If duplicate, nothing more to do
-            //std::cout << "duplicate" << std::endl;
-            return;
-        }
-    }
-
-    //Record difference edge position to insert into, keeping dummy kmer for soring and EBWT char to insert
     dummies_to_insert.insert(std::pair<ssize_t, std::pair<std::string, char> >(mapped_edge_idx, dummy_kmer_and_char));
     //edges.insert(edges.begin() + mapped_edge_idx+1, 0);
     //L.insert(L.begin() + mapped_edge_idx+1, false);
 }
 
 /*
- * Core function of Vari-Delete. Planning is done exactly as in Vari-Merge. Deleting is the inverse of merging, so the 
- * plans built in the planning step are used slightly differently. After deletion, the resultant graph must have dummies
- * inserted to have a valid BOSS structure
- *
- * Input: two de Bruijn graphs
- * Output: 0 always, but should be some failure indicator, probably
- *
+ * TODO 
  */
 int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<> &g2/*, kmer_vector_t::bufreader_type& kmers_reader, SDIter& color_iter, const int num_colors, const int colors_start, const int colors_end*/)
 {
@@ -1127,6 +887,9 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
         // find the end of the next (equivalence class) set
         while (!g1_sets[g1_set_ptr]) ++g1_set_ptr;
         while (!g2_sets[g2_set_ptr]) ++g2_set_ptr;
+        std::cout << g1_set_ptr;
+        std::cout << g2_set_ptr;
+        std::cout << "-------------" << std::endl;
         char symbol = 0; //This is what will be stored in E-BWT
         bool flag;
         // if the P_1 set is non-empty...
@@ -1152,7 +915,6 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
             else /*(g2_set_ptr > 0 && !g2_sets[g2_set_ptr - 1])*/ {
 
                 //TODO figure out how to update color matrix appropriately, but for now we can at least know whether or not to actually delete
-                //Incomplete attempt to not delete colored edge unless all its reads were being deleted
                 
                 //First, advance iter to row of color matrix corresponding to this edge
                 //size_t pos = color_iter.peek();
@@ -1177,7 +939,7 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
                 //if(should_del) {
 
 
-                    //std::cout << "edge label: " << g1.edge_label((g1_ptr)) << std::endl;
+                    std::cout << "edge label: " << g1.edge_label((g1_ptr)) << std::endl;
 
                     //std::cout << "succ label: " << g1.node_label(g1._edge_to_node(g1._forward(g1_ptr))) << std::endl;
                     //std::cout << in_edges.at(g1._edge_to_node(g1._forward(g1_ptr))) << std::endl;
@@ -1189,18 +951,27 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
                     size_t g1_end_node = g1._edge_to_node(g1._forward(g1_ptr));
                     if(in_degrees.find(g1_end_node) == in_degrees.end()) {
                         in_degrees.insert( std::pair<size_t, size_t>(g1_end_node, g1.indegree(g1_end_node)-1) );
+                        std::cout << "node label: " << g1.node_label(g1_end_node) << std::endl;
+                        std::cout << "original indeg: " << in_degrees[g1_end_node] << std::endl;
                     }
                     else {
                         in_degrees[g1_end_node] -= 1;
+                        std::cout << "node label: " << g1.node_label(g1_end_node) << std::endl;
+                        std::cout << "new indeg: " << in_degrees[g1_end_node] << std::endl;
                     }
 
                     size_t g1_start_node = g1._edge_to_node(g1_ptr);
                     if(out_degrees.find(g1_start_node) == out_degrees.end()) {
                         out_degrees.insert( std::pair<size_t, size_t>(g1_start_node, g1.outdegree(g1_start_node)-1) );
+                        std::cout << "node label: " << g1.node_label(g1_start_node) << std::endl;
+                        std::cout << "original outdeg: " << out_degrees[g1_start_node] << std::endl;
                     }
                     else {
                         out_degrees[g1_start_node] -= 1;
+                        std::cout << "node label: " << g1.node_label(g1_start_node) << std::endl;
+                        std::cout << "new outdeg: " << out_degrees[g1_start_node] << std::endl;
                     }
+                    //std::cout << out_edges.at(g1._edge_to_node(g1_ptr)) << std::endl;
 
                     g2_ptr += 1;
                     flags.adv_g2();
@@ -1242,16 +1013,16 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
               //<< ntcounts['$'] + ntcounts['A'] + ntcounts['C'] + ntcounts['G']  + ntcounts['T'] << " "
               //<< std::endl;
 
-    //Before this point, edge_mapping only has non-negative values for edges that were kept from the minuend to the
-    //difference graph. This bit of code fills in values by giving deleted edges the value of the first successor
-    //edge that was not deleted. Here, successor means the ordering in the EBWT, not successor as in folowing the edge.
+
     ssize_t i = edge_mapping.size() - 1;
     while(edge_mapping.at(i) == -1) {
         --i;
     }
 
+    std::cout << "I IS " << i << std::endl;
     size_t nonneg_edge_idx = edge_mapping.at(i);
     for(; i >= 0; --i) {
+        std::cout << "I IS " << i << std::endl;
         if(edge_mapping.at(i) == -1) {
             edge_mapping.at(i) = nonneg_edge_idx;
         }
@@ -1260,124 +1031,129 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
         }
     }
  
-    //std::cout << "edges after deletion before dummy: " << std::endl;
-    //for(size_t i=0; i < edges.size(); ++i) {
-        //std::cout << "EBWT at " << i << ": " << (edges.at(i) >> 1) << std::endl;
+    std::cout << "L:" << std::endl;
+    for(size_t i=0; i < L.size(); ++i) {
+        std::cout << L.at(i) << std::endl;
+    }
+
+ 
+ 
+    //std::unordered_map<size_t, bool> edges_needing_incoming_dummies; 
+    //std::unordered_map<size_t, bool> edges_needing_outgoing_dummies; 
+    //size_t edge_idx;
+    //for(size_t i=0; i < g1.num_nodes(); ++i) {
+        //edge_idx = g1._node_to_edge(i);
+        //std::cout << "node label: " << g1.node_label(i) << std::endl;
+        //std::cout << in_degrees[i] << std::endl;
+        //std::cout << out_degrees[i] << std::endl;
+//
+        //if(in_degrees[i] > 0 && out_degrees[i] == 0) {
+            //std::cout << "node label: " << g1.node_label(i) << std::endl;
+            //std::cout << "node needs outgoing dummy" << std::endl;
+
+            //This edge has already been added
+            //if( edges_needing_outgoing_dummies.find(edge_idx) != edges_needing_outgoing_dummies.end()) {
+                //edges_needing_outgoing_dummies[edge_idx] = 1;
+            //}
+            //else {
+                //edges_needing_outgoing_dummies[edge_idx] = 0;
+            //}
+        //}
+        //else if(out_degrees[i] > 0 && in_degrees[i] == 0) {
+            //std::cout << "node label: " << g1.node_label(i) << std::endl;
+            //std::cout << "node needs incoming dummy chain" << std::endl;
+
+            //This edge has already been added
+            //if( edges_needing_incoming_dummies.find(edge_idx) != edges_needing_incoming_dummies.end()) {
+                //edges_needing_outgoing_dummies[edge_idx] = 1;
+            //}
+            //else {
+                //edges_needing_outgoing_dummies[edge_idx] = 0;
+            //}
+        //}
+        //else {
+            //std::cout << "node 'deleted'" << std::endl;
+        //}
+
     //}
 
-    //std::cout << "edge labels in original graph" << std::endl;
-    //for(size_t i=0; i < g1.num_edges(); ++i) {
-        //std::cout << g1.edge_label(i) << std::endl;
-    //}
+    for(size_t i=0; i < edges.size(); ++i) {
+        std::cout << "EBWT at " << i << ": " << (edges.at(i) >> 1) << std::endl;
+    }
 
-    //Here, we plan the dummies we want to insert. We don't actually insert the dummies into *edges* because inserting
-    //into a vector is slow
     std::unordered_multimap<ssize_t, std::pair<std::string, char> > dummies_to_insert;
     for(size_t i=0; i < g1.num_nodes(); ++i) {
         if(in_degrees[i] > 0 && out_degrees[i] == 0) {
+            std::cout << "node label: " << g1.node_label(i) << std::endl;
+            std::cout << "node needs outgoing dummy" << std::endl;
             insert_outgoing_dummy(edges, L, ntcounts, edge_mapping, g1._node_to_edge(i), g1, dummies_to_insert);
+
+            //std::cout << "edges after outgoing dummy:" << std::endl;
+            //for(size_t i=0; i < edges.size(); ++i) {
+                //std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
+            //}
         }
         else if(out_degrees[i] > 0 && in_degrees[i] == 0) {
+            std::cout << "node label: " << g1.node_label(i) << std::endl;
+            std::cout << "node needs incoming dummy chain" << std::endl;
+            std::cout <<  "edge label: " << g1.edge_label(g1._node_to_edge(i)) << std::endl;
             insert_incoming_dummy_chain(edges, L, ntcounts, edge_mapping, g1._node_to_edge(i), g1, dummies_to_insert);
+
+            //std::cout << "edges after incoming dummy:" << std::endl;
+            //for(size_t i=0; i < edges.size(); ++i) {
+                //std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
+            //}
         }
         else {
-            //nothing to do here, the node was either completely deleted or doesn't need dummies
+            //std::cout << "node 'deleted'" << std::endl;
         }
-        //std::cout << "==========================================================" << std::endl;
+        std::cout << "==========================================================" << std::endl;
     }
 
-    //std::cout << "L:" << std::endl;
-    //for(size_t i=0; i < L.size(); ++i) {
-        //std::cout << L.at(i) << std::endl;
-    //}
+    std::cout << "L:" << std::endl;
+    for(size_t i=0; i < L.size(); ++i) {
+        std::cout << L.at(i) << std::endl;
+    }
 
-    //std::cout <<"edges in deleted graph: " << std::endl;
-    //for(size_t i=0; i < edges.size(); ++i) {
-        //std::cout << (edges.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
-    //}
-
-    //Iterate through the edges in the difference graph, building the BOSS EBWT with necessary dummies (edges_with_dummies).
-    std::vector<size_t> edges_with_dummies;
+    std::vector<char> edges_with_dummies;
     std::vector<bool> L_with_dummies; // node flags
-    for(int i=0; i<edges.size(); ++i) {
-
-        //Pair of iterators that cover all dummies we need to insert before this edge
+    for(size_t i=0; i<edges.size(); ++i) {
         auto dummies_range = dummies_to_insert.equal_range(i);
-  
-        //All dummies will have an L of zero 
-        //If there's only one dummy, insert it 
+    
         if(std::distance(dummies_range.first, dummies_range.second) == 1) {
-            //std::cout << "inserting with no other dummies at this index: " << (*dummies_range.first).second.first << std::endl;
-            std::cout << (*dummies_range.first).second.first << std::endl;
             edges_with_dummies.push_back( ((*(dummies_range.first)).second).second << 1 );
             L_with_dummies.push_back(false);
-            //Increment count of appearance of $ in nucleotide counts (last nt in node) if necessary
-            //TODO can we do this in the insert functions?
-            if( ((*(dummies_range.first)).second).first[g1.k-2] == '$') {
-                ntcounts['$'] += 1;
-            }
         }
         else if(std::distance(dummies_range.first, dummies_range.second) > 1) {
-            //More than one dummy, so need to sort them colexicographically
             std::vector<std::pair<std::string, char> > sorted_dummies;
             for(auto itr = dummies_range.first; itr != dummies_range.second; ++itr) {
+                std::cout << (*itr).second.first << std::endl;
                 sorted_dummies.push_back((*itr).second);
             }
-
-            //Sort in place
             std::sort(sorted_dummies.begin(), sorted_dummies.end(),
                 [](const std::pair<std::string, char> a, const std::pair<std::string, char> b) -> bool {
-                    std::string a_edge = a.first;
-                    std::string b_edge = b.first;
-
-                    std::string a_pred_node = a_edge.substr(0, a_edge.size()-1);
-                    std::string b_pred_node = b_edge.substr(0, b_edge.size()-1);
-
-                    std::reverse(a_pred_node.begin(), a_pred_node.end());
-                    std::reverse(b_pred_node.begin(), b_pred_node.end());
-
-                    if(a_pred_node < b_pred_node) {
-                        return true;
-                    }
-                    else if (a_pred_node > b_pred_node) {
-                        return false;
-                    }
-                    else {
-                        return a_edge[a_edge.size()-1] < b_edge[b_edge.size()-1];
-                    }
+                    return a.first < b.first;
                 });
 
-            //Insert sorted dummies
             for(auto dummy_info : sorted_dummies) {
-                //std::cout << dummy_info.first << std::endl;
                 edges_with_dummies.push_back(dummy_info.second << 1);
                 L_with_dummies.push_back(false);
-
-                //Increment count of appearance of $ in nucleotide counts (last nt in node) if necessary
-                //TODO can we do this in the insert functions?
-                if( dummy_info.first[g1.k-2] == '$') {
-                    ntcounts['$'] += 1;
-                }
             }
         }
 
-        //Always insert the actual edge and L
-        //std::cout << "inserting non-dummy: " << (edges.at(i) >> 1) << std::endl;
-        //std::cout << g1.edge_label(graph_edge_indexes.at(i)) << std::endl;
         edges_with_dummies.push_back(edges.at(i));
         L_with_dummies.push_back(L.at(i));
     }
 
-    //std::cout << "L with dummies:" << std::endl;
-    //for(size_t i=0; i < L_with_dummies.size(); ++i) {
-        //std::cout << L_with_dummies.at(i) << std::endl;
-    //}
+    std::cout << "L with dummies:" << std::endl;
+    for(size_t i=0; i < L_with_dummies.size(); ++i) {
+        std::cout << L_with_dummies.at(i) << std::endl;
+    }
 
-    //std::cout <<"edges with dummies: " << std::endl;
-    //for(size_t i=0; i < edges_with_dummies.size(); ++i) {
-        //std::cout << (edges_with_dummies.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
-    //}
-
+    std::cout << "edges with dummies:" << std::endl;
+    for(size_t i=0; i < edges_with_dummies.size(); ++i) {
+        std::cout << (edges_with_dummies.at(i) >> 1) << std::endl;//((char)edges.at(i) & 1) << std::endl;
+    }
 
     std::cout << "set pointers " << g1_set_ptr << "/" <<g1_sets.size() << " " << g2_set_ptr << "/" << g2_sets.size() << std::endl;
     std::cout << "EBWT(G) ptrs  _1: " << g1_ptr << " _2: " << g2_ptr << " _M: " << out_ptr << std::endl;
@@ -1396,8 +1172,8 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
               << std::endl;
 
 
-    for(size_t i=0; i < edges_with_dummies.size(); ++i) {
-        ef << edges_with_dummies.at(i);
+    for(size_t i=0; i < edges.size(); ++i) {
+        ef << edges.at(i);
     }
 
     ef.close();
@@ -1409,17 +1185,17 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
     std::cerr << "closing file " << std::endl << std::flush;    
 
     std::cerr << "creating succinct de bruijn graph " << std::endl << std::flush;
-    size_t n = L_with_dummies.size(); // number of elements
+    size_t n = L.size(); // number of elements
 
     
     size_t m = 0; // number of 1's
-    for (size_t i = 0; i < L_with_dummies.size(); i++)
-        m += L_with_dummies[i];
+    for (size_t i = 0; i < L.size(); i++)
+        m += L[i];
     
     std::cout << "n: " << n << " m: " << m << std::endl;
     sdsl::sd_vector_builder *b_builder = new sdsl::sd_vector_builder(n, m);
-    for (size_t i = 0; i < L_with_dummies.size(); i++)
-        if (L_with_dummies[i]) b_builder->set(i);
+    for (size_t i = 0; i < L.size(); i++)
+        if (L[i]) b_builder->set(i);
         
     sd_vector<> node_bv(*b_builder);
     delete b_builder;
@@ -1446,128 +1222,99 @@ int dbg_delete(const debruijn_graph_shifted<> &g1, const debruijn_graph_shifted<
 }
 
 
-void dumpcolumns( const debruijn_graph_shifted<> &dbg, const  parameters_t &p)
-{
-    for (unsigned int i = 0; i < dbg.k; ++i) {
-        std::stringstream fname;
-        fname <<  p.input_filename;
-        fname << i;
-        std::string s = fname.str();
-        ofstream f(s.c_str());
-        std::vector<unsigned char> g_col;
-        get_column(dbg, i, g_col);
-        for (auto c: g_col) {
-            f << c << std::endl;
-        }
-        f.close();
-    }
-    // std::vector<unsigned char> g_colprime;
-    // get_column(dbg, 0, g_colprime);
+void parse_arguments(int argc, char **argv, test_vd_parameters_t & params){
+    TCLAP::CmdLine cmd(BANNER, ' ', VERSION);
+    TCLAP::UnlabeledValueArg<std::string> target_filename_arg("target_graph", ".dbg file.", true, "", "target_graph_file", cmd);
+    TCLAP::UnlabeledValueArg<std::string> input_filename_arg("input_graph", ".dbg file.", true, "", "input_graph_file", cmd);
+    cmd.parse( argc, argv );
 
-    // for (auto c: g_colprime)
-    //     g_col.push_back(c);
-    std::vector<unsigned char> g_col(dbg.num_edges());    
-    dbg.get_edges(g_col);
-    for (unsigned int i = 1; i < dbg.k; ++i) {
-        std::stringstream fname;
-        fname <<  p.input_filename;
-        fname << ".new";
-        fname << i;
-        std::string s = fname.str();
-        ofstream f(s.c_str());
-        std::vector<unsigned char> h_col(g_col.size(),2);
-        dbg.get_column(g_col, h_col);
-        for (auto c: h_col) {
-            f << c << std::endl;
-        }
-        f.close();
-        g_col.clear();
-        g_col.insert(g_col.end(), h_col.begin(), h_col.end());
-    }
+    params.target_filename  = target_filename_arg.getValue();
+    params.input_filename  = input_filename_arg.getValue();
 }
+void find_kmers_to_delete(const debruijn_graph_shifted<> &target_dbg, const debruijn_graph_shifted<>& input_dbg/*, std::vector<std::string>& resultant_kmers*/)
+{
 
-int main(int argc, char* argv[]) {
-    parameters_t p;
+    std::string target_kmers_file("target_kmers");
+    std::cerr << "Creating target kmers file " << std::endl << std::flush;
+    std::ofstream tk_file(target_kmers_file);
+
+    for(size_t edge_idx=0; edge_idx < target_dbg.num_edges(); ++edge_idx) {
+        tk_file << target_dbg.edge_label(edge_idx) << std::endl;
+    }
+    tk_file.close();
+
+
+    std::string input_kmers_file("input_kmers");
+    std::cerr << "Creating input kmers file " << std::endl << std::flush;
+    std::ofstream ik_file(input_kmers_file);
+
+
+    for(size_t edge_idx=0; edge_idx < input_dbg.num_edges(); ++edge_idx) {
+        ik_file << input_dbg.edge_label(edge_idx) << std::endl;
+    }
+    ik_file.close();
+}
+void output_final_kmers(const debruijn_graph_shifted<>& resultant_dbg/*, const std::vector<string>& expected_kmers*/)
+{
+    std::vector<std::string> deleted_kmers;
+    std::string deleted_kmers_file("deleted_kmers");
+    std::cerr << "Creating deleted kmers file " << std::endl << std::flush;
+    std::ofstream dk_file(deleted_kmers_file);
+    for(size_t edge_idx=0; edge_idx < resultant_dbg.num_edges(); ++edge_idx) {
+        dk_file << resultant_dbg.edge_label(edge_idx) << std::endl;
+    }
+    dk_file.close();
+}
+int main(int argc, char** argv) {
+    //Load in two graphs
+
+    test_vd_parameters_t p;
     parse_arguments(argc, argv, p);
 
-    //ifstream input(p.input_filename, ios::in|ios::binary|ios::ate);
-    // Can add this to save a couple seconds off traversal - not really worth it.
-    cerr << "loading dbg1 "<< p.input_filename  << std::endl;
-    debruijn_graph_shifted<> dbg;
-    load_from_file(dbg, p.input_filename);
-    //input.close();
-    cerr << "k             : " << dbg.k << endl;
-    cerr << "num_nodes()   : " << dbg.num_nodes() << endl;
-    cerr << "num_edges()   : " << dbg.num_edges() << endl;
-    cerr << "Total size    : " << size_in_mega_bytes(dbg) << " MB" << endl;
-    cerr << "Bits per edge : " << bits_per_element(dbg) << " Bits" << endl <<endl;
+    std::cout << "Loading target debruijn graph" << p.target_filename << std::endl;
+    debruijn_graph_shifted<> target_dbg;
+    load_from_file(target_dbg, p.target_filename);
+    // dumpcolumns(target_dbg, p);
+    // dump_edges(target_dbg);
+    cerr << "k             : " << target_dbg.k << endl;
+    cerr << "num_nodes()   : " << target_dbg.num_nodes() << endl;
+    cerr << "num_edges()   : " << target_dbg.num_edges() << endl;
+    cerr << "Total size    : " << size_in_mega_bytes(target_dbg) << " MB" << endl;
+    cerr << "Bits per edge : " << bits_per_element(target_dbg) << " Bits" << endl <<endl;
  
-    cerr << "loading dbg2 " << p.input_filename2 << std::endl;
-    debruijn_graph_shifted<> dbg2;
-    load_from_file(dbg2, p.input_filename2);
+    std::cout << "Loading input debruijn graph" << p.input_filename << std::endl;
+    debruijn_graph_shifted<> input_dbg;
+    load_from_file(input_dbg, p.input_filename);
+    // dumpcolumns(input_dbg, p);
+    // dump_edges(input_dbg);
+    cerr << "k             : " << input_dbg.k << endl;
+    cerr << "num_nodes()   : " << input_dbg.num_nodes() << endl;
+    cerr << "num_edges()   : " << input_dbg.num_edges() << endl;
+    cerr << "Total size    : " << size_in_mega_bytes(input_dbg) << " MB" << endl;
+    cerr << "Bits per edge : " << bits_per_element(input_dbg) << " Bits" << endl;
 
-    // dumpcolumns(dbg, p);
-    // dump_edges(dbg);
-    cerr << "k             : " << dbg2.k << endl;
-    cerr << "num_nodes()   : " << dbg2.num_nodes() << endl;
-    cerr << "num_edges()   : " << dbg2.num_edges() << endl;
-    cerr << "Total size    : " << size_in_mega_bytes(dbg2) << " MB" << endl;
-    cerr << "Bits per edge : " << bits_per_element(dbg2) << " Bits" << endl;
+    assert(target_dbg.k == input_dbg.k);
 
-    //std::vector<unsigned char> last;
-    //std::vector<unsigned char>* cur = &last;
-    //  dbg.get_edge_column(last);
-  
-    assert(dbg.k == dbg2.k);
+    //Enumerate all kmers, and figure out which ones will be in resultant.
+    //std::vector<std::string> resultant_kmers;
 
+    find_kmers_to_delete(target_dbg, input_dbg/*, resultant_kmers*/);
 
-    //const char * matrix_file = p.matrix_filename.c_str();
-    //SDIter color_iter(matrix_file);
+    //Delete input graph from target graph to get resultant graph
+    dbg_delete(target_dbg, input_dbg);
 
+    //Check what kmers are present in the resultant graph
+    std::string resultant_filename("deleted.dbg");
+    std::cout << "Loading resultant debruijn graph" << resultant_filename << std::endl;
+    debruijn_graph_shifted<> resultant_dbg;
+    load_from_file(resultant_dbg, resultant_filename);
+    // dumpcolumns(resultant_dbg, p);
+    // dump_edges(resultant_dbg);
+    cerr << "k             : " << resultant_dbg.k << endl;
+    cerr << "num_nodes()   : " << resultant_dbg.num_nodes() << endl;
+    cerr << "num_edges()   : " << resultant_dbg.num_edges() << endl;
+    cerr << "Total size    : " << size_in_mega_bytes(resultant_dbg) << " MB" << endl;
+    cerr << "Bits per edge : " << bits_per_element(resultant_dbg) << " Bits" << endl;
 
-    //int num_colors = p.num_colors;
-    //int colors_start = p.colors_start;
-    //int colors_end = p.colors_end;
-
-
-
-    /*All these commented out were an aborted attempt to delete directly from a kmers file rather than a de Bruijn
-      graph representation. There are also commented out lines in refine_sets and subdivide for this reasons (the variables
-      that were used to test this feature are just prefixed with "test"
-    */
-
-    std::string file_name = p.kmers_filename;
-    std::vector<CKMCFile*> kmer_data_bases;
-    //size_t colors;
-    //size_t min_union;
-    //size_t max_union;
-    //uint32_t kmc_k;
-    //if ( !kmc_read_header(file_name, kmc_k, min_union, max_union, colors, kmer_data_bases) ) {
-        //COSMO_LOG(error) << "Error reading databases listed in KMC2 list file" << file_name;
-        //exit(EXIT_FAILURE);
-    //}
-    //typedef kmer_less<kmer_t>       edge_comparator_t;
-    //typedef stxxl::sorter<kmer_t,     edge_comparator_t, block_size>   edge_sorter_t;
-    //edge_sorter_t edge_sorter(edge_comparator_t(), 1024); //TODO mem size param??
-    //size_t num_kmers_read = kmc_read_kmers(kmer_data_bases, dbg.k, [&](auto x, auto c) {
-        //reverse_nt<kmer_t>         revnt;
-        //kmer_t kmer = revnt(x);
-
-        //edge_sorter.push(kmer);
-        //if (!is_palindrome(kmer, dbg.k)) {
-            //kmer_t rc_kmer = reverse_complement<kmer_t>(dbg.k)(kmer);
-            //edge_sorter.push(rc_kmer);
-        //}
-    //});
-    //edge_sorter.sort();
-
-    //kmer_vector_t   sorted_kmers;
-    //sorted_kmers.resize(edge_sorter.size());
-    //stxxl::stream::materialize(edge_sorter, sorted_kmers.begin(), sorted_kmers.end());
-    //edge_sorter.finish_clear();
-
-    //typename kmer_vector_t::bufreader_type   kmers_reader(sorted_kmers);
-
-    //Deletes dbg2 from dbg
-    dbg_delete(dbg, dbg2/*, kmers_reader, color_iter, num_colors, colors_start, colors_end*/);
- }
+    output_final_kmers(resultant_dbg/*, resultant_kmers*/);
+}

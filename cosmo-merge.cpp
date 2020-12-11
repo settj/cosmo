@@ -1,9 +1,5 @@
-//#include <iterator>
-//#include <typeinfo>
 #include <fstream>
 #include <boost/date_time/posix_time/posix_time.hpp>
-//#include <bitset>
-//#include <set>
 
 #include <stxxl.h>
 
@@ -11,9 +7,6 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 
-// #include <boost/log/trivial.hpp>
-// #include <boost/log/core.hpp>
-// #include <boost/log/expressions.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
 
@@ -27,11 +20,7 @@
 #include "io.hpp"
 #include "sort.hpp"
 #include "dummies.hpp"
-#include "debruijn_graph.hpp"
-#include "debruijn_graph_shifted.hpp"
 #include "kmc_api/kmc_file.h"
-
-
 
 struct parameters_t {
     std::string input_filename = "";

@@ -298,7 +298,7 @@ void merge_dummies(const InputRange1 & a_range, const InputRange2 & o_range, con
   auto out = boost::make_function_output_iterator(v);
   boost::set_union(a, o, out, [](boost::tuple<record_t, edge_tag> x,
                                  boost::tuple<record_t, edge_tag> y){
-    return (get<0>(get<0>(x))<<2) < (get<0>(get<0>(y))<<2);
+    return (boost::get<0>(boost::get<0>(x))<<2) < (boost::get<0>(boost::get<0>(y))<<2);
   });
 }
 

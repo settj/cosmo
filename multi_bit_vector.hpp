@@ -6,8 +6,6 @@
 #include <vector>
 #include <sdsl/bit_vectors.hpp>
 
-#include "debug.hpp"
-#include "utility.hpp"
 
 namespace cosmo {
 // Anonymous namespace so I don't pollute any client code

@@ -3,68 +3,32 @@
 #include <vector>
 #include <string>
 #include <libgen.h> // basename
-
-#include "tclap/CmdLine.h"
-
-#include <sdsl/bit_vectors.hpp>
-#include <sdsl/wavelet_trees.hpp>
-
-#include "io.hpp"
-#include "debruijn_graph_shifted.hpp"
-#include "algorithm.hpp"
-#include "cosmo-color-pd.hpp"
-#include <future>
-using namespace std;
-using namespace sdsl;
-
 #include <sys/timeb.h>
-
-
-
-//////////// pack-color headers
-
-
-#include <iostream>
-#include <fstream>
-#include <utility>
-#include <ctime>
 
 // TCLAP
 #include "tclap/CmdLine.h"
 
 #include <sdsl/bit_vectors.hpp>
-#include <cstdio>
+#include <sdsl/wavelet_trees.hpp>
 
-#include <cstdlib>
-
-#include <libgen.h>
-
-// Custom Headers
-//#include "uint128_t.hpp"
+#include "debruijn_graph_shifted.hpp"
 //#include "debug.h"
-#include "kmer.hpp"
 
-//using namespace std;
-//using namespace sdsl;
-
-#include <cstdlib>
-#include <sys/timeb.h>
-//#include "pack-color.hpp"
-
-
-
-
-
-
-
+struct parameters_t {
+    std::string input_filename = "";
+    std::string color_filename = "";
+    std::string output_prefix = "";
+    std::string ref_color = "";
+    std::string sample_mask = "";
+    std::string ref_fasta = "";
+    std::string output_matrix = "";
+};
 
 bool trace = false;
-string file_extension = ".dbg";
+std::string file_extension = ".dbg";
 
 unsigned long long global_perseq_t;
 unsigned long long global_t;
-static char base[] = {'?','A','C','G','T'};
-char dna_bases[] = "$ACGT";
 //unsigned colorgroups[] = {1, 25, 49, 57, 64, 80};
 
 debruijn_graph_shifted<>* gdbg;
@@ -95,21 +59,21 @@ void parse_arguments(int argc, char **argv, parameters_t & params)
             ".packed edge file (output from pack-edges).", true, "", "input_file", cmd);
   TCLAP::UnlabeledValueArg<std::string> color_filename_arg("color",
             ".color file (output from pack-edges).", true, "", "color_file", cmd);
-  string output_short_form = "output_prefix";
+  std::string output_short_form = "output_prefix";
   TCLAP::ValueArg<std::string> output_prefix_arg("o", "output_prefix",
             "Output prefix. Graph will be written to [" + output_short_form + "]" + file_extension + ". " +
             "Default prefix: basename(input_file).", false, "", output_short_form, cmd);
-  string ref_color = "ref_color";
+  std::string ref_color = "ref_color";
   TCLAP::ValueArg<std::string> ref_color_arg("a", "ref_color",
 	    "Ref color, ref_color [" + ref_color + "]", false, "", ref_color, cmd);
-  string sample_mask = "sample_mask";
+  std::string sample_mask = "sample_mask";
   TCLAP::ValueArg<std::string> sample_mask_arg("b", "sample_mask",
 	    "Sample mask, sample_mask [" + sample_mask + "]", false, "", sample_mask, cmd);
-  string ref_fasta = "ref_fasta";
+  std::string ref_fasta = "ref_fasta";
   TCLAP::ValueArg<std::string> ref_fasta_arg("r", "ref_fasta",
 	    "Reference FASTA filename, ref_fasta [" + ref_fasta + "]", false, "", ref_fasta, cmd);
 
-  string output_matrix = "output_matrix";
+  std::string output_matrix = "output_matrix";
   TCLAP::ValueArg<std::string> output_matrix_arg("m", "output_matrix",
 	    "Reference FASTA filename, output_matrix [" + output_matrix + "]", false, "", output_matrix, cmd);
   
@@ -211,7 +175,7 @@ std::vector<std::set<unsigned long long> > walk_refs(std::string read_seq )
 
 
     
-    while(node_i_pos < (ssize_t)read_seq.size() - gdbg->k + 1 ) {
+    while(node_i_pos < (ssize_t)(read_seq.size() - gdbg->k + 1) ) {
         if (!advance(*gdbg, read_seq, node_i, node_i_pos, found_kmers)) break;
     }
 

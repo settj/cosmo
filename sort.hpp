@@ -459,7 +459,6 @@ struct dbg_builder {
 
     COSMO_LOG(trace) << "Merging in dummies...";
 
-    using namespace sdsl;
     string temp_edge_file = out_file_base + ".w.temp";
     stxxl::syscall_file edge_file(temp_edge_file, stxxl::file::DIRECT | stxxl::file::RDWR | stxxl::file::CREAT | stxxl::file::TRUNC);
     edge_file.set_size(kmers_a.size() + outgoing_dummies_q.size() + outgoing_dummies_v.size() + incoming_dummies_v.size());
@@ -549,7 +548,7 @@ struct dbg_builder {
 
     // TODO: get these types from the input dBG instead
     COSMO_LOG(trace) << "Building dBG...";
-    typedef wt_huff<rrr_vector<63>> wt_t;
+    typedef sdsl::wt_huff<sdsl::rrr_vector<63>> wt_t;
     wt_t edges;
     construct(edges, temp_edge_file, 1);
     edge_file.close_remove();

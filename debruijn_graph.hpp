@@ -17,15 +17,13 @@
 #include "utility.hpp"
 #include "io.hpp"
 #include "debug.hpp"
-
-using namespace std;
-using namespace sdsl;
+#include "config.hpp"
 
 // TODO: convert asserts into exceptions?
 // TODO: named template paremeters (See Boost)
-template <class  t_edge_vector_type  = wt_huff<rrr_vector<63>>,
-          class  t_bit_vector_type   = sd_vector<>,
-          class  t_dummy_vector_type = vector<kmer_t>> // used to store dummies
+template <class  t_edge_vector_type  = sdsl::wt_huff<sdsl::rrr_vector<63>>,
+          class  t_bit_vector_type   = sdsl::sd_vector<>,
+          class  t_dummy_vector_type = std::vector<kmer_t>> // used to store dummies
 class debruijn_graph {
   public:
   typedef string label_type;
@@ -515,8 +513,8 @@ class debruijn_graph {
     return last-1;
   }
   
-  size_type serialize(ostream& out, structure_tree_node* v=NULL, string name="") const {
-    structure_tree_node* child = structure_tree::add_child(v, name, util::class_name(*this));
+  size_type serialize(ostream& out, sdsl::structure_tree_node* v=NULL, string name="") const {
+    sdsl::structure_tree_node* child = sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this));
     size_type written_bytes = 0;
     written_bytes += write_member(k, out, child, "k");
     written_bytes += m_node_flags.serialize(out, child, "node_flags");
@@ -533,23 +531,23 @@ class debruijn_graph {
     written_bytes += m_dummy_select_0.serialize(out, child, "dummy_select_0");
     written_bytes += sdsl::serialize(m_dummies, out, child, "dummies");
     // helper bitvector m_doc_rmin_marked and m_doc_rmax_marked are not serialize
-    structure_tree::add_size(child, written_bytes);
+    sdsl::structure_tree::add_size(child, written_bytes);
     return written_bytes;
   }
 
   //! Loads the data structure from the given istream.
   void load(std::istream& in) {
-    read_member(deconst(k), in);
+    sdsl::read_member(deconst(k), in);
     deconst(m_node_flags).load(in);
     deconst(m_node_rank).load(in);
     deconst(m_node_rank).set_vector(&m_node_flags);
     deconst(m_node_select).load(in);
     deconst(m_node_select).set_vector(&m_node_flags);
     deconst(m_edges).load(in);
-    read_member(deconst(m_symbol_ends), in);
-    read_member(deconst(m_edge_max_ranks), in);
-    read_member(deconst(m_alphabet), in);
-    read_member(deconst(m_num_nodes), in);
+    sdsl::read_member(deconst(m_symbol_ends), in);
+    sdsl::read_member(deconst(m_edge_max_ranks), in);
+    sdsl::read_member(deconst(m_alphabet), in);
+    sdsl::read_member(deconst(m_num_nodes), in);
     deconst(m_dummy_flags).load(in);
     deconst(m_dummy_rank_1).load(in);
     deconst(m_dummy_rank_1).set_vector(&m_dummy_flags);
